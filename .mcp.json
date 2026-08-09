@@ -4,10 +4,6 @@
       "type": "http",
       "url": "https://learn.microsoft.com/api/mcp"
     },
-    "terraform": {
-      "command": "docker",
-      "args": ["run", "-i", "--rm", "hashicorp/terraform-mcp-server"]
-    },
     "context7": {
       "command": "npx",
       "args": ["-y", "@upstash/context7-mcp"]
