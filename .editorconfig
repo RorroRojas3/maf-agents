@@ -29,7 +29,9 @@ csharp_using_directive_placement = outside_namespace:suggestion
 
 #### Null checking ####
 
-# is null / is not null, never == null / != null.
+# IDE0041 covers only ReferenceEquals(x, null) and (object)x == null. There is no built-in
+# EditorConfig option for the plain `x == null` form that .claude/rules/csharp.md bans, so that
+# part of the rule is enforced by review, not by tooling.
 dotnet_style_prefer_is_null_check_over_reference_equality_method = true:error
 dotnet_style_coalesce_expression = true:suggestion
 dotnet_style_null_propagation = true:suggestion
@@ -54,6 +56,13 @@ csharp_style_expression_bodied_properties = true:silent
 dotnet_diagnostic.CA1507.severity = warning
 
 #### Formatting: newline before every opening brace ####
+
+# Formatting rules roll up into IDE0055 and naming into IDE1006. Both are severity-less by
+# default, which means EnforceCodeStyleInBuild ignores them and only `dotnet format` catches a
+# violation. Promoting them makes the build the enforcement point.
+dotnet_diagnostic.IDE0055.severity = warning
+dotnet_diagnostic.IDE1006.severity = warning
+dotnet_diagnostic.IDE0005.severity = warning
 
 csharp_new_line_before_open_brace = all
 csharp_new_line_before_else = true

@@ -40,7 +40,7 @@ More are on the way across `02-agents` (tools, middleware, providers), `03-workf
 
 ## How this repo is built
 
-**Stable packages only.** No `--prerelease` anywhere. The Agent Framework core (`Microsoft.Agents.AI`, `.Abstractions`, `.OpenAI`, `.Workflows`) is GA at 1.17.0, so the samples build on that. This is also why they use OpenAI directly rather than Microsoft Foundry or Azure OpenAI: `Microsoft.Agents.AI.Foundry`, `Azure.AI.Projects`, and every `Azure.AI.OpenAI` release after 2.1.0 ship prerelease only.
+**Stable packages only.** No `--prerelease` anywhere. The Agent Framework core (`Microsoft.Agents.AI`, `.Abstractions`, `.OpenAI`, `.Workflows`) is GA at 1.17.0, so the samples build on that. This is also why they use OpenAI directly rather than Microsoft Foundry or Azure OpenAI: `Microsoft.Agents.AI.Foundry`, `Azure.AI.Projects`, and every `Azure.AI.OpenAI` release after 2.1.0 ship prerelease only. The full reasoning, and what would justify changing it, is in [ADR-0001](docs/adr/0001-openai-as-model-provider.md).
 
 **Central package management.** Every version lives in [Directory.Packages.props](Directory.Packages.props); no `.csproj` carries a `Version` attribute. Shared compiler settings — `net10.0`, latest C#, nullable, warnings-as-errors — live in [Directory.Build.props](Directory.Build.props).
 
