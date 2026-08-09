@@ -2,8 +2,8 @@
   "permissions": {
     "allow": []
   },
-  "model": "fable",
-  "availableModels": ["fable"],
+  "model": "opus",
+  "availableModels": ["opus"],
   "effortLevel": "xhigh",
   "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [

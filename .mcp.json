@@ -8,10 +8,6 @@
       "command": "docker",
       "args": ["run", "-i", "--rm", "hashicorp/terraform-mcp-server"]
     },
-    "angular-cli": {
-      "command": "npx",
-      "args": ["-y", "@angular/cli", "mcp"]
-    },
     "context7": {
       "command": "npx",
       "args": ["-y", "@upstash/context7-mcp"]
