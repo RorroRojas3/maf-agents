@@ -2,26 +2,14 @@
   "permissions": {
     "allow": []
   },
-  "model": "fable",
-  "availableModels": ["fable"],
+  "model": "opus",
+  "availableModels": ["opus"],
   "effortLevel": "xhigh",
   "enableAllProjectMcpServers": true,
-  "enabledMcpjsonServers": [
-    "microsoft-learn",
-    "terraform",
-    "angular-cli",
-    "context7"
-  ],
+  "enabledMcpjsonServers": ["microsoft-learn", "context7"],
   "enabledPlugins": {
-    "frontend-design@claude-plugins-official": true,
     "code-review@claude-plugins-official": true,
     "github@claude-plugins-official": true,
-    "playwright@claude-plugins-official": true,
-    "microsoft-docs@claude-plugins-official": true,
-    "azure@claude-plugins-official": true,
-    "skill-creator@claude-plugins-official": true,
-    "claude-md-management@claude-plugins-official": true,
-    "claude-code-setup@claude-plugins-official": true,
-    "sonarqube@claude-plugins-official": true
+    "microsoft-docs@claude-plugins-official": true
   }
 }

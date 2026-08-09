@@ -7,7 +7,9 @@ description: "Create, update, refactor, explain, or review Microsoft Agent Frame
 
 Use this skill when working with applications, agents, workflows, or migrations built on Microsoft Agent Framework.
 
-Microsoft Agent Framework is the unified successor to Semantic Kernel and AutoGen, combining their strengths with new capabilities. Because it is still in public preview and changes quickly, always ground implementation advice in the latest official documentation and samples rather than relying on stale knowledge.
+Microsoft Agent Framework is the unified successor to Semantic Kernel and AutoGen, combining their strengths with new capabilities.
+
+The core packages (`Microsoft.Agents.AI`, `.Abstractions`, `.OpenAI`, `.Workflows`) are **GA**; several integrations — Foundry, hosting, and A2A — are still prerelease. Check per package rather than treating the whole framework as preview, and always ground implementation advice in the latest official documentation and samples rather than relying on stale knowledge.
 
 ## Determine the target language first
 

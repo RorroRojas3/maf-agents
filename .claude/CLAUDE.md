@@ -1,8 +1,29 @@
 # CLAUDE.md
 
-Reusable project memory for **C#/.NET back ends and Angular front ends**. It loads automatically every session and governs how Claude Code works in this project. Drop it into a repository and follow it for all C# and Angular work.
+Project memory for **maf-agents** — runnable **Microsoft Agent Framework** agent examples in **C#/.NET**. It loads automatically every session and governs how Claude Code works here.
 
-Layout: detailed standards in `.claude/rules/` auto-apply by file path; skills, subagents, and the `/ngrx-signals-sync` command live under `.claude/`; `settings.json` pins the model and reasoning effort (`"effortLevel": "xhigh"`); the root `CHANGELOG.md` is the running record of changes, owned by the `se-technical-writer` subagent.
+Layout: detailed C# standards in `.claude/rules/csharp.md` auto-apply to `*.cs`; skills and subagents live under `.claude/`; `settings.json` pins the model and reasoning effort (`"effortLevel": "xhigh"`); the root `CHANGELOG.md` is the running record of changes, owned by the `se-technical-writer` subagent.
+
+## This repo
+
+Every sample is a self-contained, runnable console app that demonstrates one Microsoft Agent Framework concept.
+
+```
+samples/<NN-category>/<SampleName>/     # e.g. samples/01-get-started/HelloAgent/
+```
+
+Categories mirror the official Agent Framework sample taxonomy: `01-get-started`, `02-agents`, `03-workflows`, `04-hosting`, `05-end-to-end`. Each sample folder carries its own `README.md` covering what it shows, prerequisites, and how to run it.
+
+**Stable packages only — never pass `--prerelease`.** This is a standing constraint, not a default to be improved on. It is the reason samples use the OpenAI provider rather than Microsoft Foundry: as of `Microsoft.Agents.AI` 1.17.0 the core framework is GA, but `Microsoft.Agents.AI.Foundry`, `Azure.AI.Projects`, and every `Azure.AI.OpenAI` past 2.1.0 ship prerelease only. If a task seems to need a prerelease package, raise it with the user rather than adding one.
+
+**Provider:** OpenAI direct, via `Microsoft.Agents.AI.OpenAI`. Prefer the Responses client (`client.GetResponsesClient()`) over Chat Completions — it carries the full hosted-tool surface.
+
+**Central package management:** every version lives in `Directory.Packages.props`. A `PackageReference` in a `.csproj` carries no `Version` attribute.
+
+Two deliberate carve-outs from the standards below — deviations by decision, not oversight:
+
+- **Secrets.** The C# standard prefers `DefaultAzureCredential` + Key Vault over secrets. An OpenAI API key has no managed-identity equivalent, so samples read it from `dotnet user-secrets` (which stores outside the repo tree) or the `OPENAI_API_KEY` environment variable. The rule's intent — no secret is ever committed — still holds absolutely.
+- **Tests.** The `[ProjectName].Tests` xUnit convention applies to shared library code. Samples call a live model and are not unit-tested.
 
 ## Communication & comments (always)
 
@@ -28,43 +49,31 @@ Full standards live in `.claude/rules/csharp.md` (auto-applies to `*.cs`). The a
 - PascalCase for types, methods, and public members; `_camelCase` private fields; camelCase locals and parameters; `I`-prefixed interfaces.
 - Declare variables non-nullable; validate `null` at entry points only; use `is null` / `is not null` — **never** `== null` / `!= null`.
 - Suffix async methods with `Async`; **never** block with `.Result`, `.Wait()`, or `.GetAwaiter().GetResult()`; no `async void` outside event handlers; flow a `CancellationToken` through long-running operations (see the `csharp-async` skill).
-- Centralize error handling; return errors as Problem Details (RFC 9457). **Never log PII or secrets**; prefer `DefaultAzureCredential` + Azure Key Vault / Managed Identity over secrets in code or config.
+- Centralize error handling; return errors as Problem Details (RFC 9457). **Never log PII or secrets.**
 - XML doc comments on all public APIs (see the `csharp-docs` skill).
 - xUnit tests in a `[ProjectName].Tests` project, named `MethodName_Scenario_ExpectedBehavior`; Arrange-Act-Assert structure but **no** `// Arrange` / `// Act` / `// Assert` comments (see the `csharp-xunit` skill).
 - When reviewing, make only **high-confidence** suggestions; comment on _why_ a non-obvious design decision was made.
-
-## Angular / NgRx state (always)
-
-- Standalone components, `ChangeDetectionStrategy.OnPush`, signals for state. Assume zoneless.
-- Non-trivial state belongs in an **NgRx Signal Store** (`@ngrx/signals`) — invoke the `ngrx-signal-store` skill rather than hand-rolling a `BehaviorSubject` service.
-- Keep `protectedState` on; write state only via `patchState` with standalone updaters.
-- Use `rxMethod` (not `signalMethod`) whenever requests can overlap — `switchMap` is what prevents a stale response overwriting a fresh one. One store per entity type; `withEntities` for keyed collections.
-- This is **not** classic NgRx: no actions, reducers, or effects unless the Events plugin is a deliberate choice.
-- For Angular questions that are not about state, use the `angular-developer` skill and the `angular-cli` MCP server instead of relying on memory.
 
 ## Skills
 
 The skill roster (names + descriptions) is always in context; routing notes the roster lacks:
 
-- `ngrx-signal-store` is the source of truth for Angular state management — prefer it over `angular-developer` there.
-- The three `github-actions-*` skills are the lanes preloaded by the `github-actions-reviewer` subagent; each is also invokable on its own.
+- `microsoft-agent-framework` is the source of truth for agent and workflow work here — read `references/dotnet.md` for the .NET surface. The framework moves fast, so ground specifics in live docs rather than memory.
+- `microsoft-docs` is the research lane for learn.microsoft.com and beyond; it wraps the `microsoft-learn` and `context7` MCP servers.
 - `prd` is preloaded by `prd-generator`; `technical-writing` (document-type templates) by `se-technical-writer`.
-- `microsoft-agent-framework` is in public preview — ground its advice in live docs.
 
 ## Detailed standards — `.claude/rules/`
 
-Rules auto-load when you edit a matching file; the globs live in each rule's frontmatter (`csharp`, `aspnet-rest-apis`, `azure-functions-csharp`, `blazor-wasm`, `csharp-mcp-server`, `terraform`). When reviewing or planning without editing, `Read` the matching rule directly.
+`csharp.md` auto-loads whenever you edit a `*.cs` file. When reviewing or planning without editing, `Read` it directly.
 
 ## MCP servers — see `@.mcp.json`
 
-`.claude/settings.json` sets `enableAllProjectMcpServers: true`, so the servers configured in `@.mcp.json` are available. Use them when relevant:
+`.claude/settings.json` sets `enableAllProjectMcpServers: true`, so the servers configured in `@.mcp.json` are available:
 
-> **Trust gate:** since Claude Code v2.1.196, a checked-in `.claude/settings.json` cannot approve its own repo's MCP servers while the folder is **untrusted** — the key is ignored and servers sit at "Pending approval" until the workspace trust dialog is accepted. To have these servers auto-approve in every repo (even before trusting), add a name-based list to your **user-level** `~/.claude/settings.json`: `"enabledMcpjsonServers": ["microsoft-learn", "terraform", "angular-cli", "context7"]`. If a server shows **Rejected**, a stale per-project choice is cached — run `claude mcp reset-project-choices` in that repo.
+- **`microsoft-learn`** — ground version-specific Agent Framework / .NET answers in official docs (`microsoft_docs_search` → `microsoft_code_sample_search` → `microsoft_docs_fetch`) instead of memory.
+- **`context7`** — docs outside learn.microsoft.com; resolve the library ID first, then query.
 
-- **`microsoft-learn`** — ground version-specific .NET/Azure answers in official docs (`microsoft_docs_search` → `microsoft_code_sample_search` → `microsoft_docs_fetch`) instead of memory.
-- **`angular-cli`** — ground Angular answers in the installed version (`list_projects` → `get_best_practices` → `search_documentation` → `find_examples`).
-- **`terraform`** — infrastructure-as-code.
-- **`context7`** — docs outside learn.microsoft.com (VS Code, GitHub, Aspire); resolve the library ID first, then query.
+> **Trust gate:** since Claude Code v2.1.196, a checked-in `.claude/settings.json` cannot approve its own repo's MCP servers while the folder is **untrusted** — the key is ignored and servers sit at "Pending approval" until the workspace trust dialog is accepted. To have these servers auto-approve even before trusting, add a name-based list to your **user-level** `~/.claude/settings.json`: `"enabledMcpjsonServers": ["microsoft-learn", "context7"]`. If a server shows **Rejected**, a stale per-project choice is cached — run `claude mcp reset-project-choices` in that repo.
 
 ## Delegation rules
 
@@ -72,9 +81,7 @@ Every subagent is pinned to extra-high reasoning effort; model, tools, and prelo
 
 - **When the user asks to write a PRD, spec a feature, define requirements, or break a feature into epics/user stories**, delegate to `prd-generator` — do not write PRDs inline. Its report always starts with a `PRD-STATUS:` line. If it starts `PRD-STATUS: NEEDS-INPUT`, show its questions to the user verbatim (do not answer them yourself) and re-invoke the agent with the answers. It only creates GitHub issues when re-invoked with a statement that the user explicitly approved issue creation for the PRD path. `docs/prd/` is owned by `prd-generator`; a PRD is a pre-implementation artifact — writing one gets no `se-technical-writer` delegation and no changelog entry. Implementation plans for a feature that has a PRD should reference its story IDs (`US-xxx`).
 - **After implementing or modifying C# code**, delegate a quality review to `csharp-code-reviewer`. It reports findings; it does not edit files.
-- **After implementing or modifying Angular code**, delegate a quality review to `angular-code-reviewer`. It reports findings; it does not edit files.
-- **After writing or modifying GitHub Actions workflows** (`.github/workflows/*.yml` or composite actions), delegate a review to `github-actions-reviewer`. It reports findings; it does not edit files.
-- **After a feature is implemented and the relevant reviewer verdict passes**, ALWAYS delegate to `se-technical-writer` to author or update Markdown docs under `docs/` (create the folder if it does not exist) **and** add the entry to the root `CHANGELOG.md` under `[Unreleased]`. Also delegate to it whenever implementation details need documenting on their own.
+- **After a sample or feature is implemented and the reviewer verdict passes**, ALWAYS delegate to `se-technical-writer` to author or update Markdown docs under `docs/` (create the folder if it does not exist) **and** add the entry to the root `CHANGELOG.md` under `[Unreleased]`. Also delegate to it whenever implementation details need documenting on their own.
 
 ## Changelog & feature tracking
 
@@ -87,12 +94,10 @@ Root `CHANGELOG.md`, [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) fo
 ## Common commands
 
 ```bash
-dotnet build     # compile
-dotnet test      # run xUnit tests
-dotnet format    # apply .editorconfig formatting
+dotnet build                                          # compile the solution
+dotnet format                                         # apply .editorconfig formatting
+dotnet run --project samples/01-get-started/HelloAgent
+
+# supply the OpenAI key without committing it
+dotnet user-secrets set "OpenAI:ApiKey" "sk-..." --project samples/01-get-started/HelloAgent
 ```
-
-## Maintenance
-
-- `/ngrx-signals-sync` — check the official NgRx Signals docs for drift and refresh the `ngrx-signal-store` skill. Cheap and silent when nothing changed; when something did, it leaves the diff in the working tree for review rather than committing.
-- `/repo-audit` — verify the two harness trees still mirror each other (skills, rules↔instructions, agent twins and model parity, registries) and lint config cost hygiene. Cheap and silent when clean; report-only by default; `--fix` applies only mechanical repairs and leaves the diff for review.

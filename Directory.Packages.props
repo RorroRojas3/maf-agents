@@ -1,0 +1,25 @@
+<Project>
+
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+
+  <!-- Stable releases only. Microsoft.Agents.AI.Foundry, .Hosting, .A2A and Azure.AI.Projects
+       ship prerelease only and are therefore not available to this repo. -->
+  <ItemGroup Label="Microsoft Agent Framework">
+    <PackageVersion Include="Microsoft.Agents.AI" Version="1.17.0" />
+    <PackageVersion Include="Microsoft.Agents.AI.OpenAI" Version="1.17.0" />
+  </ItemGroup>
+
+  <ItemGroup Label="Model providers">
+    <PackageVersion Include="OpenAI" Version="2.12.0" />
+  </ItemGroup>
+
+  <ItemGroup Label="Configuration">
+    <PackageVersion Include="Microsoft.Extensions.Configuration" Version="10.0.9" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.9" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.UserSecrets" Version="10.0.9" />
+  </ItemGroup>
+
+</Project>

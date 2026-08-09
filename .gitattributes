@@ -1,0 +1,13 @@
+# Normalize to LF in the working tree on every platform. Without eol=lf a Windows clone with
+# core.autocrlf=true checks out CRLF, which then fails `dotnet format --verify-no-changes`
+# against the LF setting in .editorconfig.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.dll binary
+*.exe binary
