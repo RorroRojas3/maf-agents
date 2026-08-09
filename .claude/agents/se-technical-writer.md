@@ -37,4 +37,4 @@ You own the root `CHANGELOG.md`, which follows the [Keep a Changelog](https://ke
 - Verify code examples compile and version numbers are current; ground .NET/Azure claims in the `microsoft-learn` MCP (`microsoft_docs_search`, then `microsoft_code_sample_search` / `microsoft_docs_fetch`) rather than memory.
 - Code blocks always carry a language identifier; commands show expected output; terminology stays consistent throughout.
 - Task-oriented over feature-oriented ("How to export data", not "Export feature").
-- When documenting code in an area another skill covers (e.g. `ngrx-signal-store`, `csharp-async`, `ef-core`, `angular-developer`), read that skill's `SKILL.md` so terminology and recommendations match the repo's standards.
+- When documenting code in an area another skill covers (e.g. `microsoft-agent-framework`, `csharp-async`, `ef-core`), read that skill's `SKILL.md` so terminology and recommendations match the repo's standards.
