@@ -5,6 +5,7 @@
     <File Path=".gitignore" />
     <File Path="Directory.Build.props" />
     <File Path="Directory.Packages.props" />
+    <File Path="config/appsettings.sample.json" />
     <File Path="global.json" />
   </Folder>
   <Folder Name="/docs/">
@@ -16,4 +17,7 @@
   <Folder Name="/samples/01-get-started/">
     <Project Path="samples/01-get-started/HelloAgent/HelloAgent.csproj" />
   </Folder>
+  <Folder Name="/samples/02-agents/" />
+  <Folder Name="/src/" />
+  <Folder Name="/tests/" />
 </Solution>
