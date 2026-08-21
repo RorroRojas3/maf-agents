@@ -111,13 +111,15 @@ internal sealed class ImageAgentTools(
 
         if (ImageRequestParser.ParseSize(requestedSize) is { } parsedSize)
         {
-            generationOptions.Size = parsedSize;
+            generationOptions.Size = GeneratedImageSize.W256xH256;
         }
 
+#pragma warning disable OPENAI001 // ImageEditOptions.Quality is evaluation-only; its generation-side twin is not.
         if (ImageRequestParser.ParseQuality(requestedQuality) is { } parsedQuality)
         {
-            generationOptions.Quality = parsedQuality;
+            generationOptions.Quality = GeneratedImageQuality.LowQuality;
         }
+#pragma warning restore OPENAI001
 
         GeneratedImage image = await _imageClient
             .GenerateImageAsync(prompt, generationOptions, cancellationToken)
@@ -157,7 +159,7 @@ internal sealed class ImageAgentTools(
 
         if (ImageRequestParser.ParseSize(requestedSize) is { } parsedSize)
         {
-            editOptions.Size = GeneratedImageSize.W1024xH1024;
+            editOptions.Size = GeneratedImageSize.W256xH256;
         }
 
 #pragma warning disable OPENAI001 // ImageEditOptions.Quality is evaluation-only; its generation-side twin is not.
