@@ -4,6 +4,7 @@ using OpenAI;
 using OpenAI.Responses;
 
 IConfiguration configuration = new ConfigurationBuilder()
+    .AddJsonFile("appsettings.json", optional: true, reloadOnChange: false)
     .AddUserSecrets<Program>(optional: true)
     .AddEnvironmentVariables()
     .Build();

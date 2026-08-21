@@ -4,6 +4,10 @@
 **Date**: 2026-08-09
 **Deciders**: Rodrigo Rojas (repository owner)
 
+> Extended, not superseded, by [ADR-0002](0002-foundry-via-openai-v1-route.md): a later sample
+> reaches Microsoft Foundry within the same GA-packages-only constraint, through the
+> OpenAI-compatible `/openai/v1/` route rather than through OpenAI itself.
+
 ## Context
 
 Every sample in this repo is a console app that calls a real model, so each one needs a model provider and a client to reach it. Microsoft Agent Framework supports several — Microsoft Foundry, Azure OpenAI, OpenAI, Anthropic, Ollama — and the choice is the same for all samples, because a reader who learns one client-construction pattern should not have to relearn it in the next folder.

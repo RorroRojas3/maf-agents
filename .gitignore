@@ -480,3 +480,11 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# Local credentials shared by the samples. The tracked sample file stays.
+config/appsettings.json
+config/appsettings.*.json
+!config/appsettings.sample.json
+
+# Images and transcripts the samples generate at runtime.
+output/

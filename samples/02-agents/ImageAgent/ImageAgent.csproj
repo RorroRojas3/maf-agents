@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <UserSecretsId>0c58136c-f752-4740-9844-2bd7dd48bcad</UserSecretsId>
+    <UserSecretsId>b5e18ca4-edb2-4a2c-9cee-4b30cb666982</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
@@ -10,9 +10,11 @@
     <PackageReference Include="Microsoft.Agents.AI.OpenAI" />
     <PackageReference Include="OpenAI" />
     <PackageReference Include="Microsoft.Extensions.Configuration" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" />
     <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" />
     <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" />
   </ItemGroup>
 
 </Project>

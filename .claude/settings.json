@@ -3,7 +3,6 @@
     "allow": []
   },
   "model": "opus",
-  "availableModels": ["opus"],
   "effortLevel": "xhigh",
   "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": ["microsoft-learn", "context7"],
