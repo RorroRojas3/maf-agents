@@ -17,7 +17,9 @@
   <Folder Name="/samples/01-get-started/">
     <Project Path="samples/01-get-started/HelloAgent/HelloAgent.csproj" />
   </Folder>
-  <Folder Name="/samples/02-agents/" />
+  <Folder Name="/samples/02-agents/">
+    <Project Path="samples/02-agents/ImageAgent/ImageAgent.csproj" />
+  </Folder>
   <Folder Name="/src/" />
   <Folder Name="/tests/" />
 </Solution>

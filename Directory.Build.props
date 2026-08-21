@@ -26,4 +26,13 @@
     <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1901;NU1902;NU1903;NU1904</WarningsNotAsErrors>
   </PropertyGroup>
 
+  <!-- One git-ignored config/appsettings.json at the repo root serves every sample, so an
+       endpoint and key are entered once rather than per project. Conditional so a fresh clone
+       without local credentials still builds. -->
+  <ItemGroup Condition="Exists('$(MSBuildThisFileDirectory)config/appsettings.json')">
+    <Content Include="$(MSBuildThisFileDirectory)config/appsettings.json"
+             Link="appsettings.json"
+             CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
