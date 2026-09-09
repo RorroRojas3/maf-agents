@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="Andes.Agents.Api/Andes.Agents.Api.csproj" />
+  <Project Path="Andes.Agents.Common/Andes.Agents.Common.csproj" />
+  <Project Path="Andes.Agents.Entity/Andes.Agents.Entity.csproj" />
+  <Project Path="Andes.Agents.Repository/Andes.Agents.Repository.csproj" />
+  <Project Path="Andes.Agents.Service/Andes.Agents.Service.csproj" />
+</Solution>
