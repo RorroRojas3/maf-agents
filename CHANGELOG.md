@@ -1,0 +1,22 @@
+# Changelog
+
+All notable changes to this project are documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
+## [Unreleased]
+
+### Added
+
+- **Weather agent** (`weather-agent/Andes.Agents`): a production-oriented ASP.NET Core host for a Microsoft Agent Framework weather agent, reachable over both [A2A](docs/agent/hosting-and-protocols.md#a2a) (HTTP+JSON and JSON-RPC) and [AG-UI](docs/agent/hosting-and-protocols.md#ag-ui), and secured end to end with Microsoft Entra ID. Conversations persist to Azure Cosmos DB — one document per session and one per message — so a caller can resume a conversation across turns and browse or delete their own conversation history through a new `api/conversations` REST resource. Includes three weather tools backed by a deterministic in-process data source, OpenTelemetry tracing and token-usage metrics exported to Azure Monitor, per-caller rate limiting, and an OpenAPI/Scalar reference UI. See [docs/README.md](docs/README.md) for the full documentation set.
+- A second, optional model provider: `MicrosoftFoundry` configuration registers a Chat Completions client on the same Azure AI Foundry resource and route as the agent's, for a future caller that needs a plain model call rather than an agent turn. Leaving it unconfigured registers nothing and doesn't affect startup.
+- Global per-request logging (`RequestLogging` configuration) writes one line per request — method, matched route, status, elapsed time — without ever recording a body, prompt, query value, or the caller's Entra object id.
+- Every problem+json error response now carries `traceId` (the Application Insights operation id) and `requestId` (the id the server's own log lines carry for that request), so a caller-reported failure can be found in telemetry and logs without exposing any request content.
+
+### Changed
+
+- Added `Directory.Build.props` and `Directory.Packages.props` (central package management) to `weather-agent/Andes.Agents/`, plus a new `Andes.Agents.Dto` project, so the solution's six projects share one place for build settings and package versions.
+- Added `.claude/rules/api-architecture.md`, a portable layering and naming rule for minimal-API solutions shaped `Api → Service → Repository → Entity`, adopted for this repository with the `Andes.Agents` folder layout and its Cosmos-only persistence, embedded prompt, and wire-contract route deviations documented in the rule's appendix.
+- Renamed the agent's model provider configuration from `Foundry` to `AzureOpenAI` to make room for the new second provider above; `MicrosoftFoundry` now names the optional Chat Completions deployment. The agent's own deployment, key, and behavior are unchanged.
+- The `AzureAd` section is now read through a validated options class, so a missing or contradictory Entra ID setting fails at startup rather than at the first request; `AzureAd:Authority` is accepted as an alternative to setting `AzureAd:Instance` and `AzureAd:TenantId` separately.
+- Consolidated six per-exception-type handlers into one exception handler covering every mapped failure; an unhandled (5xx) failure's response no longer echoes any detail or domain problem type, only a trace id — the failure itself still goes to the log.

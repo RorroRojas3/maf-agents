@@ -1,0 +1,41 @@
+<Project>
+
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+
+  <!-- The Agent Framework core is GA. Every hosting package (A2A, AG-UI, the session-store
+       abstraction) ships prerelease only, so the whole hosting train is pinned to one exact build. -->
+  <ItemGroup Label="Microsoft Agent Framework">
+    <PackageVersion Include="Microsoft.Agents.AI" Version="1.20.0" />
+    <PackageVersion Include="Microsoft.Agents.AI.OpenAI" Version="1.20.0" />
+    <PackageVersion Include="Microsoft.Agents.AI.Hosting" Version="1.20.0-preview.260831.1" />
+    <PackageVersion Include="Microsoft.Agents.AI.Hosting.AspNetCore" Version="1.20.0-preview.260831.1" />
+    <PackageVersion Include="Microsoft.Agents.AI.Hosting.A2A.AspNetCore" Version="1.20.0-preview.260831.1" />
+    <PackageVersion Include="Microsoft.Agents.AI.Hosting.AGUI.AspNetCore" Version="1.20.0-preview.260831.1" />
+    <PackageVersion Include="A2A.AspNetCore" Version="1.0.0-preview2" />
+  </ItemGroup>
+
+  <ItemGroup Label="Model providers">
+    <PackageVersion Include="OpenAI" Version="2.12.0" />
+    <PackageVersion Include="Microsoft.Extensions.AI" Version="10.9.0" />
+    <PackageVersion Include="Microsoft.Extensions.AI.OpenAI" Version="10.9.0" />
+  </ItemGroup>
+
+  <ItemGroup Label="Azure">
+    <PackageVersion Include="Microsoft.Azure.Cosmos" Version="3.63.0" />
+    <!-- The Cosmos SDK depends on Newtonsoft.Json internally and refuses to build unless the version is pinned explicitly. -->
+    <PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
+    <PackageVersion Include="Azure.Identity" Version="1.21.0" />
+    <PackageVersion Include="Azure.Monitor.OpenTelemetry.AspNetCore" Version="1.6.0" />
+    <PackageVersion Include="Azure.Extensions.AspNetCore.Configuration.Secrets" Version="1.5.2" />
+  </ItemGroup>
+
+  <ItemGroup Label="Web">
+    <PackageVersion Include="Microsoft.Identity.Web" Version="4.14.2" />
+    <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
+    <PackageVersion Include="Scalar.AspNetCore" Version="2.17.3" />
+  </ItemGroup>
+
+</Project>

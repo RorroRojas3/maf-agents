@@ -1,6 +1,6 @@
 ---
 paths:
-  - "enterprise-gpt-api/**"
+  - "weather-agent/**"
 ---
 
 # API architecture
@@ -215,46 +215,36 @@ tests/<Root>.Integration.Test/
 
 ---
 
-## This repository — Enterprise.Gpt
+## This repository — Andes.Agents
 
-`<Root>` = `Enterprise.Gpt`; `<Prefix>` = `Enterprise` (`AddEnterpriseAuthentication`, `AddEnterpriseCors`, `AddEnterprisePersistence`, `AddEnterpriseKeyVault`, `AddEnterpriseDataProtection`, `AddEnterpriseExceptionHandling`, `AddEnterpriseTelemetry`, `AddEnterpriseHealthChecks`, `AddEnterpriseProblemDetails`); `AddCoreServices` registers the clock, `ITokenService` and the validators. `Api/Endpoints/ModelEndpoints.cs` is the template for new modules. Routes are wire contracts: `McpServerEndpoints` still maps `api/mcps`.
+`<Root>` = `Andes.Agents`; `<Prefix>` = `Andes` (`AddAndesKeyVault`, `AddAndesTelemetry`, `AddAndesAuthentication`, `AddAndesCors`, `AddAndesRateLimiting`, `AddAndesProblemDetails`, `AddAndesExceptionHandling`, `AddAndesHealthChecks`, `AddAndesOpenApi`, `AddAndesAzureCredential`, `AddAndesPersistence`); `AddCoreServices` registers the clock, the caller context, the prompt loader and minimal-API validation. The solution lives at `weather-agent/Andes.Agents/Andes.Agents.slnx`; `Directory.Build.props` and `Directory.Packages.props` beside it hold the shared settings and every package version.
 
 **Folders per project**
 
 | Project | Folders |
 |---|---|
-| Api | `Endpoints/{Conversation,Document,McpServer,Model,Permission,Project,Report,User}Endpoints.cs`; `Configuration/{ChatProviders,Conversations,Documents,Export,FileAgent,McpServers,Models,Permissions,Projects,Reports,Summarization,Tokenization,Transcripts,Users}Configuration.cs` + `Providers/{AmazonBedrock,Anthropic,AzureAIFoundry,AzureOpenAI}`; `Options/{KeyVault,RequestLogging,Telemetry}Options.cs` |
-| Service | `Conversations/{Export/{Interfaces,Renderers,Fonts},Rendering,Tokenization}`, `Documents/{Chunking,Extraction/Interfaces,Retrieval,SheetQuery,Summarization}`, `FileAgent/{Tools,Services,Interfaces,Models,Skills}`, `McpServers`, `Models`, `Permissions`, `Projects`, `Reports`, `Transcripts`, `Users`; cross-cutting `BackgroundJobs`, `Caching`, `Exceptions`, `Observability`, `Options`, `Prompts`, `Security`, `Serialization`, `Sorting` |
-| Repository | `DbContexts/EnterpriseGptDbContext.cs`; `Configurations/{Conversations,McpServers,Models,Permissions,Projects,Users}`; `Migrations/` |
-| Entity | `Base`, `Conversations`, `McpServers`, `Models`, `Permissions`, `Projects`, `Transcripts` (Cosmos documents: `TranscriptsRecords.cs`, `TranscriptsConstants.cs`, `PartitionKeys.cs`), `Users` |
-| Dto | `Actions/{Conversations,McpServers,Models,Permissions,Projects,Users}`; `Conversations`, `Documents`, `McpServers`, `Models`, `Pagination`, `Permissions`, `Projects`, `Reports`, `Users` |
-| Common | `Constants/{ChatClientKeys,ChatRequestProperties,PermissionIds,ProjectFieldLengths,Providers,TelemetryNames}`, `Enums/` (25), `Extensions/EnumExtensions` |
-| Unit.Test | `Api/`, `Service/`, `Repository/`, `Entity/`, `Dto/`, `Common/`, `TestInfrastructure/` |
-| Integration.Test | `Endpoints/`, `Conversations/`, `Documents/{Retrieval,SheetQuery,Summarization}`, `Transcripts/`, `FileAgent/`, `Health/`, `Middleware/`, `TestInfrastructure/`; `FileAgentSpike/` and `FileAgentBenchmark/` are exploratory suites against the live sandbox and mirror nothing by design |
+| Api | `Endpoints/{Agent,Session}Endpoints.cs` + `WeatherAgentCard.cs`; `Configuration/{Agents,Authentication,AzureCredential,CoreServices,Cors,ExceptionHandling,ForwardedHeaders,KeyVault,OpenApi,Persistence,RateLimiting,Sessions,Weather}Configuration.cs` + `AzureCredentials.cs` + `Providers/{MicrosoftFoundry,AzureOpenAI}ProviderConfiguration.cs` + `Providers/OpenAIChatClientFactory.cs`; `ExceptionHandlers/GlobalExceptionHandler.cs`; `Health/`; `Middleware/RequestLogging{Middleware,Registration}.cs`; `Observability/{TelemetryRegistration,RequestDescriptor}.cs`; `Options/{AgentCard,ApiDocs,Azure,AzureAd,AzureOpenAI,Cors,CosmosDb,KeyVault,MicrosoftFoundry,OpenAIEndpoint,RateLimiting,RequestLogging,Telemetry}Options.cs`; `Problems/{ProblemTypes,ProblemDetailsRegistration,ProblemResponseWriter}.cs`; `Startup/CosmosBootstrapper.cs` |
+| Service | `Agents/UsageRecordingAgent.cs`; `Sessions/{CosmosAgentSessionStore,CosmosChatHistoryProvider,SessionService,SessionMapper,SessionIdValidator,SessionsExceptions}.cs`; `Weather/{WeatherService,WeatherRecords}.cs` + `Weather/Tools/WeatherToolProvider.cs`; cross-cutting `Exceptions`, `Options`, `Prompts`, `Security`, `Serialization` |
+| Repository | `Cosmos/{CosmosContainers,CosmosQueries,CosmosRecords,CosmosResourceProvisioner,PartitionKeys}.cs`; `Sessions/{SessionRepository,SessionMessageRepository,SessionsRecords,SessionsExceptions}.cs`; `Serialization/{RepositoryJsonOptions,UtcDateTimeOffsetJsonConverter}.cs` |
+| Entity | `Sessions/SessionsRecords.cs` (Cosmos documents and the state-bag records) |
+| Dto | `Actions/Sessions/SessionActions.cs`; `Sessions/`; `Pagination/` |
+| Common | `Constants/{AgentNames,AuthorizationPolicies,ChatClientKeys,ClaimTypeNames,PromptNames,RateLimitPolicies,SessionIdRules,SessionStateKeys,TelemetryNames,WeatherLimits}.cs` |
 
-**Sanctioned names** — `Chat` means the LLM client or wire role, never the conversation: `ChatRoles`, `ChatClientKeys`, `ChatRequestProperties`, `ChatRoleMapper`, `ChatClientResolver`, `ChatProvidersConfiguration`, `<Provider>ChatDefaults`, `ChatMetrics`, `ChatClientTelemetryExtensions`, `ChatUsageObserver`, `ChatUsageScope`, `ChatConversationDto`. The domain word is `Conversation`. `McpDto` (what a user sees) and `McpServerDto` (what an admin edits) describe the same aggregate on purpose.
+**Sanctioned deviations**
 
-**FileAgent** — `Service/FileAgent/{Tools,Services,Interfaces,Models,Skills}`: `Tools/FileAgentToolProvider.cs` is what the model calls; `Services/` the logic behind it; `Interfaces/` exists because the implementations sit in `Services/` and `Tools/`; `Models/` holds `FileAgentRecords`, `FileAgentConstants`, `FileAgentExceptions`. `Skills/<skill>/SKILL.md` and `conversion-matrix.json` ship from here to `FileAgent/` in the output. Unit tests mirror `Service/FileAgent/Services/`.
+- **No EF Core.** The only store is Azure Cosmos DB through the raw SDK, so `Repository/` carries `Cosmos/`, `Sessions/` and `Serialization/` in place of `DbContexts/`, `Configurations/` and `Migrations/`. Options the repositories need arrive as the `CosmosContainerNames` record, registered by `AddAndesPersistence` from `Api/Options/CosmosDbOptions.cs`; `Repository/` holds no options class.
+- **The prompt is an embedded resource**, not a shipped `<None>` asset: `Service/Prompts/weather-agent-instructions.md` is read by `PromptTemplateLoader` through its logical name in `Common/Constants/PromptNames.cs`.
+- **Routes are wire contracts.** The `Sessions` feature is served at `api/conversations` by `SessionEndpoints`; the A2A and AG-UI hosts live in `AgentEndpoints` at `weather/a2a` and `weather/ui`, and the agent card at `/.well-known/agent-card.json`.
+- **`Api/Options/OpenAIEndpointOptions.cs` is an abstract base, not a section.** `MicrosoftFoundryOptions` and `AzureOpenAIOptions` derive from it and carry the `SectionName`; the base holds the endpoint contract both providers validate.
+- **One exception handler, not one per condition.** `ExceptionHandlers/GlobalExceptionHandler.cs` maps every exception in a single switch expression, so adding a domain exception means adding an arm there and a type to `Problems/ProblemTypes.cs`.
+- **`Problems/ProblemTypes.cs` stays in Api** as the rule's own layout lists it; every other constant catalog is in `Common/Constants/`.
 
-**Export** — `Service/Conversations/Export/{Interfaces,Renderers,Fonts}`: `IConversationExportRenderer` has five implementations in `Renderers/`, registered as keyed singletons by `ConversationExportFormats` in `Api/Configuration/ExportConfiguration.cs`. Output paths `Fonts/` and `Files/` are the deployment contract, preserved via `Link`.
+**Sanctioned names** — `Session` is the domain word for a conversation (`SessionDocument`, `SessionService`, `SessionEndpoints`); `Conversation` appears only in the route and in `ConversationBusyException`, which mirrors the `conversation-busy` problem type. `Chat` means the model client or wire role (`ChatClientKeys`, `CosmosChatHistoryProvider`).
 
-**`Providers` alias** — `Api/Configuration/Providers` shadows `Common.Constants.Providers`; alias it: `using ProviderKeys = Enterprise.Gpt.Common.Constants.Providers;`.
-
-**Shipped assets** (`Enterprise.Gpt.Service.csproj`; the CI publish gate in `pipelines/templates/stage-ci.yml` asserts these paths)
-
-| Source | Output | Read by |
-|---|---|---|
-| `Conversations/Export/Fonts/*.{ttf,otf,ttc}` | `Fonts/` (Link) | `ExportFontResolver` |
-| `Conversations/Export/Renderers/conversation-history.html` | `Files/conversation-history.html` (Link) | `HtmlExportRenderer` |
-| `Prompts/*.md` | `Prompts/` | `PromptTemplateLoader` |
-| `FileAgent/conversion-matrix.json` | `FileAgent/` | `ConversionMatrix` |
-| `FileAgent/Skills/**/*.md` | `FileAgent/Skills/` | `FileAgentSkills` |
-
-**Tests** — unit: 2561 (SQLite in-memory via `SqliteDbContextFixture`, no Docker); integration: 494 (`CustomWebApplicationFactory` + Testcontainers SQL Server 2025 + Cosmos emulator, `[Collection("Integration")]`, `[Trait("Category", "Integration")]`); the `FileAgentSpike` suite drives a live code-interpreter sandbox and is not deterministic.
+**Tests** — none yet. When they arrive they follow the layout above under `weather-agent/Andes.Agents/tests/`.
 
 ```bash
-# in enterprise-gpt-api/
-dotnet test --filter "Category!=Integration"    # unit only
-dotnet test                                     # all; integration needs Docker
-dotnet ef migrations has-pending-model-changes --project Enterprise.Gpt.Repository --startup-project Enterprise.Gpt.Api
+# from the repo root
+dotnet build weather-agent/Andes.Agents/Andes.Agents.slnx
+dotnet format weather-agent/Andes.Agents/Andes.Agents.slnx --verify-no-changes
 ```

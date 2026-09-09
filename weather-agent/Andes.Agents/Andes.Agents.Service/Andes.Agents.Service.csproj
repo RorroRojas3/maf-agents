@@ -1,9 +1,23 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Andes.Agents.Dto\Andes.Agents.Dto.csproj" />
+    <ProjectReference Include="..\Andes.Agents.Repository\Andes.Agents.Repository.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- IHttpContextAccessor for the caller context; nothing else from ASP.NET Core is used here. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Agents.AI" />
+    <PackageReference Include="Microsoft.Agents.AI.Hosting" />
+    <PackageReference Include="Microsoft.Extensions.AI" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Prompts\*.md" LogicalName="Prompts/%(Filename)%(Extension)" />
+  </ItemGroup>
 
 </Project>
