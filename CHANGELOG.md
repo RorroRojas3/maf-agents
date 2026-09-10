@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - A second, optional model provider: `MicrosoftFoundry` configuration registers a Chat Completions client on the same Azure AI Foundry resource and route as the agent's, for a future caller that needs a plain model call rather than an agent turn. Leaving it unconfigured registers nothing and doesn't affect startup.
 - Global per-request logging (`RequestLogging` configuration) writes one line per request — method, matched route, status, elapsed time — without ever recording a body, prompt, query value, or the caller's Entra object id.
 - Every problem+json error response now carries `traceId` (the Application Insights operation id) and `requestId` (the id the server's own log lines carry for that request), so a caller-reported failure can be found in telemetry and logs without exposing any request content.
+- The `/scalar` reference UI can now sign a caller in through Microsoft Entra ID instead of only accepting a pasted bearer token: set `ApiDocs:ClientId` (and `ApiDocs:Scopes`) and Scalar offers an `EntraId` option using PKCE with no client secret, returning the authorization code in the URL fragment so it never reaches request logs or telemetry. Leaving `ApiDocs:ClientId` blank keeps the previous bearer-only behavior. See [Configuration](docs/operations/configuration.md#apidocs) and the [runbook](docs/operations/runbook.md#configure-user-secrets) for the Entra ID app registration steps.
 
 ### Changed
 

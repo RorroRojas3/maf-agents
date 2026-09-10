@@ -152,8 +152,19 @@ Applies to the A2A and AG-UI routes only (the `AgentTurns` policy) — `api/conv
 | Key | Meaning | Default | Required |
 |---|---|---|---|
 | `ApiDocs:Enabled` | Serve `/openapi/v1.json` and the `/scalar` reference UI outside Development. | `false` | No |
+| `ApiDocs:ClientId` | Application (client) id Scalar signs in with — the API's own registration or a separate public-client registration. Blank leaves Scalar with a pasted bearer token only. | _(blank)_ | No |
+| `ApiDocs:Scopes` | Space-separated, **fully qualified** scopes Scalar requests, e.g. `api://<api-client-id>/access_as_user`. | _(blank)_ | Once `ClientId` is set |
 
-The Development environment serves both regardless of this flag; `appsettings.Development.json` also sets it to `true` explicitly.
+The Development environment serves both regardless of `ApiDocs:Enabled`; `appsettings.Development.json` also sets it to `true` explicitly.
+
+**Scalar sign-in.** With `ApiDocs:ClientId` set, the OpenAPI document declares two security schemes and lists them on every operation as separate requirements, so either alone satisfies it:
+
+- `Bearer` — the existing HTTP scheme, paste a token.
+- `EntraId` — an OAuth2 authorization-code flow, `authorizationUrl`/`tokenUrl` built from `AzureAd:Instance`/`AzureAd:TenantId` (or `AzureAd:Authority`, with any trailing `/v2.0` removed), scopes from `ApiDocs:Scopes`.
+
+Scalar preselects `EntraId` and `ApiDocs:Scopes`, and uses PKCE (S256) with no client secret. It requests `response_mode=fragment`, so the authorization code returns in the URL fragment and never reaches the server or Application Insights request telemetry. The redirect URI is built per request as `{scheme}://{host}{pathBase}/scalar/`; `X-Forwarded-Proto` is honored so the scheme is correct behind a TLS-terminating ingress, but `X-Forwarded-Host` is not. With `ApiDocs:ClientId` blank, behavior is unchanged: `Bearer` only, preselected.
+
+`ApiDocs:ClientId` set with `ApiDocs:Scopes` empty fails startup, naming both keys. See the [runbook](runbook.md#configure-user-secrets) for the Entra ID app registration steps and [troubleshooting](runbook.md#troubleshooting) for the sign-in failures those steps prevent.
 
 ## Development overrides at a glance
 

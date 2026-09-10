@@ -58,6 +58,21 @@ dotnet user-secrets set "AzureAd:TenantId" "<tenant-id>"
 dotnet user-secrets set "AzureAd:ClientId" "<api-app-registration-id>"
 ```
 
+Add `ApiDocs:ClientId`/`ApiDocs:Scopes` too if you want Scalar to sign callers in through Entra ID instead of pasting a bearer token:
+
+```bash
+dotnet user-secrets set "ApiDocs:ClientId" "<api-client-id>"
+dotnet user-secrets set "ApiDocs:Scopes" "api://<api-client-id>/access_as_user"
+```
+
+On the app registration named by `ApiDocs:ClientId`, under **Authentication**, add a **Single-page application** platform — not Web — with the exact redirect URIs, trailing slash included:
+
+- `https://localhost:7237/scalar/`
+- `http://localhost:5072/scalar/`, for the http launch profile
+- each deployed host's `https://<host>/scalar/`
+
+The API must also expose the scope `ApiDocs:Scopes` names, in its fully qualified form. Two scope settings are easy to confuse: `AzureAd:Scopes` takes the **short** scope name (`access_as_user`), matched against the token's `scp` claim; `ApiDocs:Scopes` takes the **fully qualified** form (`api://<api-client-id>/access_as_user`). Neither should be `<client-id>/.default`, and `AzureAd:Audience` is normally left blank, which falls back to the client id.
+
 ### Run
 
 ```bash
@@ -189,7 +204,10 @@ With `Telemetry:ConnectionString` set, run a turn and check Application Insights
 
 ### Scalar
 
-Open `https://localhost:7237/scalar`; the Bearer scheme should be preselected, and every route in `api/conversations` should be listed with its `401`/`404`/validation-problem responses documented.
+Open `https://localhost:7237/scalar`; every route in `api/conversations` should be listed with its `401`/`404`/validation-problem responses documented.
+
+- **`ApiDocs:ClientId` blank (default):** the `Bearer` scheme is preselected — paste a token from [Get a token](#get-a-token) into the Authorization modal.
+- **`ApiDocs:ClientId` set:** the `EntraId` scheme is preselected instead, with `ApiDocs:Scopes` pre-checked. Click **Authorize** and sign in; the popup closes, Scalar holds an access token, and `GET /api/conversations` sent from Scalar returns `200`. With `Telemetry:ConnectionString` set, the popup's `GET /scalar/` request in Application Insights carries no `code` in its URL, since Scalar requests `response_mode=fragment`.
 
 ## Provisioning Cosmos DB with IaC
 
@@ -278,6 +296,15 @@ The same startup guard couldn't resolve a token-issuing authority. Set `AzureAd:
 
 **The application won't start, with a message naming `RequestLogging:ExcludedPaths`.**
 An entry in that array doesn't start with `/`. `AddAndesRequestLogging` rejects that at startup rather than letting `PathString` throw on the first request that arrives — fix the entry to include its leading slash (e.g. `/health`, not `health`).
+
+**The application won't start, with a message naming `ApiDocs:Scopes`.**
+`ApiDocs:ClientId` is set but `ApiDocs:Scopes` is blank — Scalar would have a client to sign in with but no scopes to request. Set `ApiDocs:Scopes` to the fully qualified scope(s) the API exposes, or blank `ApiDocs:ClientId` to fall back to bearer-token-only.
+
+**Signing in to Scalar fails with `AADSTS50011` (redirect URI mismatch).**
+Register the exact `/scalar/` URI for the host and scheme you're using — trailing slash included — on the `ApiDocs:ClientId` app registration (see [Configure user-secrets](#configure-user-secrets)).
+
+**Signing in to Scalar fails with `AADSTS9002326` (redirect URI under the wrong platform).**
+The redirect URI is registered under **Web** instead of **Single-page application**. Scalar redeems the code from the browser, and Entra ID allows that cross-origin redemption only for Single-page application redirect URIs — move it there.
 
 **Tracking down a failure a caller reported.**
 Every problem+json response carries `traceId` (the W3C trace id, and the Application Insights operation id — search for it there) and `requestId` (the connection-scoped id that same request's own log lines carry, from `RequestLoggingMiddleware` and `GlobalExceptionHandler` alike). Ask the caller for `traceId` first; it's the one that survives past this process.
