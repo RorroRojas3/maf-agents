@@ -1,10 +1,10 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace Andes.Agents.Repository.Serialization;
+namespace Andes.Agents.Repository.Cosmos.Serialization;
 
 /// <summary>Serializer settings the Cosmos client is created with; every document in this layer is shaped by them.</summary>
-public static class RepositoryJsonOptions
+public static class CosmosJsonOptions
 {
     /// <summary>camelCase names, nulls omitted, fixed-width UTC timestamps.</summary>
     public static JsonSerializerOptions Default { get; } = Create();

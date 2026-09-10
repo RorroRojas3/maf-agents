@@ -6,3 +6,11 @@ public sealed class AzureOpenAIOptions : OpenAIEndpointOptions
     /// <summary>Configuration section these options bind from.</summary>
     public const string SectionName = "AzureOpenAI";
 }
+
+internal sealed class AzureOpenAIOptionsValidator : OpenAIEndpointOptionsValidator<AzureOpenAIOptions>
+{
+    public AzureOpenAIOptionsValidator()
+        : base(AzureOpenAIOptions.SectionName)
+    {
+    }
+}

@@ -7,3 +7,11 @@ public sealed class MicrosoftFoundryOptions : OpenAIEndpointOptions
     /// <summary>Configuration section these options bind from.</summary>
     public const string SectionName = "MicrosoftFoundry";
 }
+
+internal sealed class MicrosoftFoundryOptionsValidator : OpenAIEndpointOptionsValidator<MicrosoftFoundryOptions>
+{
+    public MicrosoftFoundryOptionsValidator()
+        : base(MicrosoftFoundryOptions.SectionName)
+    {
+    }
+}

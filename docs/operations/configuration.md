@@ -2,7 +2,7 @@
 
 ## Overview
 
-Configuration follows the standard ASP.NET Core layering: `appsettings.json` (checked in, every key present, secrets blank) → `appsettings.Development.json` (Development-only overrides) → Azure Key Vault (when enabled) → environment variables → `dotnet user-secrets` in Development. Every section below binds to a strongly typed `Options` class, validated with `ValidateDataAnnotations().ValidateOnStart()` (or an inline `.Validate(...)`), so a missing or malformed value fails **at startup**, not on the first request that needs it.
+Configuration follows the standard ASP.NET Core layering: `appsettings.json` (checked in, every key present, secrets blank) → `appsettings.Development.json` (Development-only overrides) → Azure Key Vault (when enabled) → environment variables → `dotnet user-secrets` in Development. Every section below binds to a strongly typed `Options` class, validated with a FluentValidation `AbstractValidator<T>` through `.ValidateWithFluentValidation().ValidateOnStart()`, so a missing or malformed value fails **at startup**, not on the first request that needs it.
 
 Local secrets go in `dotnet user-secrets` (the Api project's `UserSecretsId` is already set) or environment variables — never in a tracked file. See the [runbook](runbook.md) for the exact commands to seed a local run.
 
@@ -83,6 +83,8 @@ A Chat Completions deployment on the same resource and route, registered as the 
 Naming `MicrosoftFoundry:Endpoint` opts the whole section into the same startup validation `AzureOpenAI` gets — the `/openai/v1/` suffix, and `ApiKey`/`Model` both required. Key Vault secret name: `MicrosoftFoundry--ApiKey`.
 
 ## `CosmosDb` — persistence
+
+Bound by `Repository/Cosmos/Options/CosmosDbOptions.cs` — the store's own project, not Api — and registered by `AddAndesCosmosPersistence`, which `Program.cs` calls directly.
 
 | Key | Meaning | Default | Required |
 |---|---|---|---|

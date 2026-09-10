@@ -1,3 +1,4 @@
+using Andes.Agents.Repository.Cosmos;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 
 namespace Andes.Agents.Api.Health;
@@ -8,7 +9,7 @@ internal static class HealthRegistration
 
     public static IServiceCollection AddAndesHealthChecks(this IServiceCollection services)
     {
-        services.AddHealthChecks().AddCheck<CosmosHealthCheck>("cosmos", tags: [_readyTag]);
+        services.AddHealthChecks().AddAndesCosmosHealthCheck("cosmos", _readyTag);
 
         return services;
     }

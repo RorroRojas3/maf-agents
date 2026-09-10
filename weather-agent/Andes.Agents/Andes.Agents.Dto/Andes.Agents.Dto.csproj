@@ -4,4 +4,8 @@
     <ProjectReference Include="..\Andes.Agents.Common\Andes.Agents.Common.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="FluentValidation" />
+  </ItemGroup>
+
 </Project>

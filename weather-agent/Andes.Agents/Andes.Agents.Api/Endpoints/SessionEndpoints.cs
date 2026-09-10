@@ -1,3 +1,4 @@
+using Andes.Agents.Api.Filters;
 using Andes.Agents.Common.Constants;
 using Andes.Agents.Dto.Actions.Sessions;
 using Andes.Agents.Dto.Pagination;
@@ -20,25 +21,27 @@ internal static class SessionEndpoints
         group.MapGet("", ListAsync)
             .WithName("ListConversations")
             .WithSummary("Lists the caller's conversations, newest first.")
-            .ProducesValidationProblem();
+            .ProducesValidationProblem()
+            .AddEndpointFilter(ValidationEndpointFilter.Require<ListSessionsActionDto>());
 
         group.MapGet("{sessionId}", GetAsync)
             .WithName("GetConversation")
             .WithSummary("Returns one of the caller's conversations.")
             .ProducesProblem(StatusCodes.Status404NotFound)
-            .ProducesValidationProblem();
+            .ProducesProblem(StatusCodes.Status400BadRequest);
 
         group.MapGet("{sessionId}/messages", ListMessagesAsync)
             .WithName("ListConversationMessages")
             .WithSummary("Lists the messages of one of the caller's conversations in order.")
             .ProducesProblem(StatusCodes.Status404NotFound)
-            .ProducesValidationProblem();
+            .ProducesValidationProblem()
+            .AddEndpointFilter(ValidationEndpointFilter.Require<ListSessionMessagesActionDto>());
 
         group.MapDelete("{sessionId}", DeleteAsync)
             .WithName("DeleteConversation")
             .WithSummary("Deletes one of the caller's conversations and every message in it.")
             .ProducesProblem(StatusCodes.Status404NotFound)
-            .ProducesValidationProblem();
+            .ProducesProblem(StatusCodes.Status400BadRequest);
 
         return app;
     }

@@ -1,5 +1,5 @@
-using Andes.Agents.Api.Options;
 using Andes.Agents.Repository.Cosmos;
+using Andes.Agents.Repository.Cosmos.Options;
 using Microsoft.Extensions.Options;
 
 namespace Andes.Agents.Api.Startup;

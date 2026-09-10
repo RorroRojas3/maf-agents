@@ -2,6 +2,7 @@ using System.Text.Json;
 using Andes.Agents.Common.Constants;
 using Andes.Agents.Entity.Sessions;
 using Andes.Agents.Repository.Sessions;
+using Andes.Agents.Repository.Sessions.Interfaces;
 using Andes.Agents.Service.Security;
 using Andes.Agents.Service.Serialization;
 using Microsoft.Agents.AI;
@@ -9,21 +10,21 @@ using Microsoft.Agents.AI.Hosting;
 
 namespace Andes.Agents.Service.Sessions;
 
-/// <summary>Persists hosted agent sessions in Cosmos DB, one document per session under the caller's partition.</summary>
+/// <summary>Persists hosted agent sessions, one document per session under the caller's partition.</summary>
 /// <remarks>
 /// The caller is read only when a session is looked up or deleted; a save relies on the owner bound into
 /// the session, so it does not depend on an ambient HTTP context.
 /// </remarks>
-public sealed class CosmosAgentSessionStore(
+public sealed class PersistedAgentSessionStore(
     ISessionRepository sessions,
     ISessionMessageRepository messages,
-    CosmosChatHistoryProvider history,
+    PersistedChatHistoryProvider history,
     ICallerContext caller,
     TimeProvider timeProvider) : AgentSessionStore
 {
     private readonly ISessionRepository _sessions = sessions;
     private readonly ISessionMessageRepository _messages = messages;
-    private readonly CosmosChatHistoryProvider _history = history;
+    private readonly PersistedChatHistoryProvider _history = history;
     private readonly ICallerContext _caller = caller;
     private readonly TimeProvider _timeProvider = timeProvider;
 

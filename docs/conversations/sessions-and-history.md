@@ -49,12 +49,12 @@ Both containers enable TTL (`DefaultTimeToLive = -1`) with no default — nothin
 
 ## Session store and history provider
 
-Two Service-layer classes implement Microsoft Agent Framework's session extensibility points, both singletons over the raw repositories in `Andes.Agents.Repository`:
+Two Service-layer classes implement Microsoft Agent Framework's session extensibility points, both singletons over `ISessionRepository`/`ISessionMessageRepository` — the store-agnostic contracts in `Andes.Agents.Repository/Sessions/`, currently implemented by `CosmosSessionRepository`/`CosmosSessionMessageRepository` in `Repository/Cosmos/Sessions/`. Neither Service type is named after a storage technology, by design: swapping the store behind the interfaces changes nothing here.
 
-- **`CosmosAgentSessionStore`** (`: AgentSessionStore`) owns the *session document* — identity, title, counts, usage, and the serialized `AgentSession` blob.
-- **`CosmosChatHistoryProvider`** (`: ChatHistoryProvider`) owns the *message documents* — replaying history before a turn and appending new messages after one.
+- **`PersistedAgentSessionStore`** (`: AgentSessionStore`) owns the *session document* — identity, title, counts, usage, and the serialized `AgentSession` blob.
+- **`PersistedChatHistoryProvider`** (`: ChatHistoryProvider`) owns the *message documents* — replaying history before a turn and appending new messages after one.
 
-They're registered with `.WithSessionStore(..., withIsolation: false)`. The framework's isolation wrapper composes `"{oid}::{contextId}"` into one opaque string; the repositories need the two halves separately for the hierarchical partition key, so `CosmosAgentSessionStore` reads `ICallerContext.UserId` itself, once, at lookup — and every downstream write keys off the `userId` bound into the session at that point, not off an ambient `HttpContext`. That's also why `SaveSessionAsync` can run without an HTTP request in scope.
+They're registered with `.WithSessionStore(..., withIsolation: false)`. The framework's isolation wrapper composes `"{oid}::{contextId}"` into one opaque string; the repositories need the two halves separately for the hierarchical partition key, so `PersistedAgentSessionStore` reads `ICallerContext.UserId` itself, once, at lookup — and every downstream write keys off the `userId` bound into the session at that point, not off an ambient `HttpContext`. That's also why `SaveSessionAsync` can run without an HTTP request in scope.
 
 ### Lookup — `GetSessionAsync(agent, sessionId)`
 

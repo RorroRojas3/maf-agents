@@ -8,6 +8,8 @@ paths:
 
 # Azure Functions C# Development
 
+> Applies only to projects that host Azure Functions. This repository has none, so nothing here applies to it.
+
 ## General Instructions
 
 - Always use the **isolated worker model** (not the legacy in-process model) for all new Azure Functions projects targeting .NET 6 or later.
@@ -51,7 +53,7 @@ paths:
 ## Dependency Injection and Configuration
 
 - Register all external clients (e.g., `BlobServiceClient`, `ServiceBusClient`, `CosmosClient`) as singletons using `services.AddAzureClients()` from the `Azure.Extensions.AspNetCore.Configuration.Secrets` package with `DefaultAzureCredential`.
-- Use `IOptions<T>` or `IOptionsMonitor<T>` for strongly typed configuration sections.
+- Use `IOptions<T>` or `IOptionsMonitor<T>` for strongly typed configuration sections. In a solution that follows `api-architecture.md`, its options rule wins: `AddOptions<T>().Bind(...).ValidateWithFluentValidation().ValidateOnStart()`, never `Configure<T>`.
 - Avoid using `static` state in functions; all shared state should flow through DI-registered services.
 - Register `HttpClient` instances via `IHttpClientFactory` to manage connection pooling and avoid socket exhaustion.
 
@@ -83,7 +85,7 @@ paths:
 
 ## Security
 
-- Always validate and sanitize HTTP trigger inputs before processing; use FluentValidation or Data Annotations.
+- Always validate and sanitize HTTP trigger inputs before processing; use FluentValidation.
 - Use `AuthorizationLevel.Function` with function keys stored in Key Vault for internal API-to-API calls.
 - Integrate Azure API Management (APIM) in front of HTTP-triggered functions for public-facing APIs to handle auth, rate limiting, and routing.
 - Restrict inbound access using App Service networking features (IP restrictions, Private Endpoints) for sensitive functions.
@@ -91,7 +93,7 @@ paths:
 
 ## Testing
 
-- Unit-test service classes independently of the function host using standard xUnit/NUnit with mocked dependencies.
+- Unit-test service classes independently of the function host; the test stack is fixed in `csharp.md` (xUnit v3, NSubstitute).
 - Integration-test functions using `Azurite` (local Azure Storage emulator) and `TestServer` or the Azure Functions Core Tools.
 - Use the `Microsoft.Azure.Functions.Worker.Testing` helpers where available to construct mock `FunctionContext` instances.
 - Avoid testing the trigger plumbing itself; focus tests on the business logic extracted into services.

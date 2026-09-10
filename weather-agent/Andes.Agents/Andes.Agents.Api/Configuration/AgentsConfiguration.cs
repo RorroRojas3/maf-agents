@@ -1,9 +1,11 @@
 using Andes.Agents.Api.Options;
 using Andes.Agents.Common.Constants;
+using Andes.Agents.Common.Validation;
 using Andes.Agents.Service.Agents;
 using Andes.Agents.Service.Prompts;
 using Andes.Agents.Service.Sessions;
 using Andes.Agents.Service.Weather.Tools;
+using FluentValidation;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Hosting;
 using Microsoft.Extensions.AI;
@@ -15,13 +17,12 @@ internal static class AgentsConfiguration
 {
     public static IServiceCollection AddAgents(this IServiceCollection services, IConfiguration configuration)
     {
+        services.AddSingleton<IValidator<AgentCardOptions>, AgentCardOptionsValidator>();
+
         services
             .AddOptions<AgentCardOptions>()
             .Bind(configuration.GetSection(AgentCardOptions.SectionName))
-            .ValidateDataAnnotations()
-            .Validate(
-                options => options.PublicBaseUrl?.IsAbsoluteUri == true,
-                $"{AgentCardOptions.SectionName}:{nameof(AgentCardOptions.PublicBaseUrl)} must be an absolute URL.")
+            .ValidateWithFluentValidation()
             .ValidateOnStart();
 
         services.AddAGUIServer();
@@ -29,7 +30,7 @@ internal static class AgentsConfiguration
         services
             .AddAIAgent(AgentNames.Weather, CreateWeatherAgent)
             // The store scopes every lookup by the caller itself, so the framework's isolation wrapper is not layered on top.
-            .WithSessionStore((provider, _) => provider.GetRequiredService<CosmosAgentSessionStore>(), withIsolation: false)
+            .WithSessionStore((provider, _) => provider.GetRequiredService<PersistedAgentSessionStore>(), withIsolation: false)
             .AddA2AServer();
 
         return services;
@@ -52,7 +53,7 @@ internal static class AgentsConfiguration
                     Instructions = provider.GetRequiredService<IPromptTemplateLoader>().Load(PromptNames.WeatherAgent),
                     Tools = provider.GetRequiredService<WeatherToolProvider>().CreateTools(),
                 },
-                ChatHistoryProvider = provider.GetRequiredService<CosmosChatHistoryProvider>(),
+                ChatHistoryProvider = provider.GetRequiredService<PersistedChatHistoryProvider>(),
                 // The keyed client already carries function invocation and telemetry.
                 UseProvidedChatClientAsIs = true,
             },

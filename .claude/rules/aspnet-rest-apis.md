@@ -41,17 +41,19 @@ paths:
 
 ## Validation and Error Handling
 
-- Validate with DataAnnotations or FluentValidation; customize validation responses when the default shape does not fit.
+- Validate with FluentValidation, never DataAnnotations; customize validation responses when the default shape does not fit.
+- The built-in minimal-API validator (`AddValidation()`) is DataAnnotations-only. In a FluentValidation solution do not register it — attach an endpoint filter that resolves `IValidator<T>` and runs it, so one mechanism owns validation rather than two.
 - Handle exceptions globally in middleware; return Problem Details (RFC 9457) responses consistently.
 
 ## Versioning and Documentation
 
 - Version APIs — controllers and Minimal APIs alike.
-- Document endpoints, parameters, responses, and authentication with Swagger/OpenAPI.
+- Produce the OpenAPI document with the built-in `Microsoft.AspNetCore.OpenApi` (`AddOpenApi`/`MapOpenApi`) and render it with **Scalar** (`MapScalarApiReference`).
+- Never `Swashbuckle.AspNetCore`, `AddSwaggerGen`, `UseSwagger` or `UseSwaggerUI`; migrate any project still on it.
 
 ## Testing
 
-- Unit test controllers, Minimal API endpoints, and services; add integration tests for endpoints.
+- Unit test controllers, Minimal API endpoints, and services; add integration tests for endpoints. Framework choices live in `csharp.md`.
 - Mock dependencies; test authentication and authorization logic.
 
 ## Performance

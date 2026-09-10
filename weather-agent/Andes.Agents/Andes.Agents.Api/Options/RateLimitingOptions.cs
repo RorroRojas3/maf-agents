@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+using FluentValidation;
 
 namespace Andes.Agents.Api.Options;
 
@@ -9,6 +9,11 @@ public sealed class RateLimitingOptions
     public const string SectionName = "RateLimiting";
 
     /// <summary>Gets or sets how many agent turns one caller may start per minute.</summary>
-    [Range(1, 10_000)]
     public int PermitPerMinute { get; set; } = 30;
+}
+
+internal sealed class RateLimitingOptionsValidator : AbstractValidator<RateLimitingOptions>
+{
+    public RateLimitingOptionsValidator() =>
+        RuleFor(options => options.PermitPerMinute).InclusiveBetween(1, 10_000);
 }

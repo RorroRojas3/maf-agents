@@ -6,6 +6,7 @@ using Andes.Agents.Api.Middleware;
 using Andes.Agents.Api.Observability;
 using Andes.Agents.Api.Problems;
 using Andes.Agents.Api.Startup;
+using Andes.Agents.Repository.Cosmos;
 using Microsoft.Extensions.Options;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
@@ -23,7 +24,7 @@ builder.Services.AddAndesExceptionHandling();
 builder.Services.AddAndesHealthChecks();
 builder.Services.AddAndesOpenApi(builder.Configuration);
 builder.Services.AddAndesAzureCredential(builder.Configuration);
-builder.Services.AddAndesPersistence(builder.Configuration);
+builder.Services.AddAndesCosmosPersistence(builder.Configuration);
 builder.Services.AddCoreServices();
 builder.Services.AddWeather();
 builder.Services.AddMicrosoftFoundryProvider(builder.Configuration);

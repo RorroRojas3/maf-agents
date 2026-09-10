@@ -1,5 +1,7 @@
 using Andes.Agents.Api.Options;
 using Andes.Agents.Common.Constants;
+using Andes.Agents.Common.Validation;
+using FluentValidation;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Options;
 
@@ -18,13 +20,12 @@ internal static class MicrosoftFoundryProviderConfiguration
             return services;
         }
 
+        services.AddSingleton<IValidator<MicrosoftFoundryOptions>, MicrosoftFoundryOptionsValidator>();
+
         services
             .AddOptions<MicrosoftFoundryOptions>()
             .Bind(section)
-            .ValidateDataAnnotations()
-            .Validate(
-                options => options.HasV1Route(),
-                $"{MicrosoftFoundryOptions.SectionName}:{nameof(OpenAIEndpointOptions.Endpoint)} must end with '{OpenAIEndpointOptions.V1RoutePath}'.")
+            .ValidateWithFluentValidation()
             .ValidateOnStart();
 
         services.AddKeyedSingleton<IChatClient>(ChatClientKeys.MicrosoftFoundry, (provider, _) =>

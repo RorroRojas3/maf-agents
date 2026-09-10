@@ -38,4 +38,16 @@
     <PackageVersion Include="Scalar.AspNetCore" Version="2.17.3" />
   </ItemGroup>
 
+  <!-- Repository is a plain class library, so the options, DI and health-check pieces the Api project
+       gets from the ASP.NET Core shared framework have to be referenced explicitly here. -->
+  <ItemGroup Label="Extensions">
+    <PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="10.0.12" />
+  </ItemGroup>
+
+  <ItemGroup Label="Validation">
+    <PackageVersion Include="FluentValidation" Version="12.1.1" />
+  </ItemGroup>
+
 </Project>

@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+using FluentValidation;
 
 namespace Andes.Agents.Api.Options;
 
@@ -9,10 +9,22 @@ public sealed class AgentCardOptions
     public const string SectionName = "AgentCard";
 
     /// <summary>Gets or sets the address clients reach this host at; the card's interface URLs are built on it.</summary>
-    [Required]
     public Uri? PublicBaseUrl { get; set; }
 
     /// <summary>Gets or sets the version the card advertises.</summary>
-    [Required]
     public string Version { get; set; } = "1.0.0";
+}
+
+internal sealed class AgentCardOptionsValidator : AbstractValidator<AgentCardOptions>
+{
+    public AgentCardOptionsValidator()
+    {
+        RuleFor(options => options.PublicBaseUrl)
+            .Cascade(CascadeMode.Stop)
+            .NotNull()
+            .Must(url => url!.IsAbsoluteUri)
+            .WithMessage($"'{AgentCardOptions.SectionName}:{{PropertyName}}' must be an absolute URL.");
+
+        RuleFor(options => options.Version).NotEmpty();
+    }
 }

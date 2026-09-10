@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+using FluentValidation;
 
 namespace Andes.Agents.Api.Options;
 
@@ -12,9 +12,21 @@ public sealed class RequestLoggingOptions
     public bool Enabled { get; set; } = true;
 
     /// <summary>Gets or sets the duration above which a request is logged as a warning instead of information.</summary>
-    [Range(1, int.MaxValue)]
     public int SlowRequestThresholdMilliseconds { get; set; } = 5_000;
 
     /// <summary>Gets or sets the path prefixes that are not logged; probes would otherwise dominate the sink.</summary>
     public string[] ExcludedPaths { get; set; } = ["/health"];
+}
+
+internal sealed class RequestLoggingOptionsValidator : AbstractValidator<RequestLoggingOptions>
+{
+    public RequestLoggingOptionsValidator()
+    {
+        RuleFor(options => options.SlowRequestThresholdMilliseconds).GreaterThan(0);
+
+        // A prefix without its leading slash makes PathString throw on every request, and a blank one matches everything.
+        RuleForEach(options => options.ExcludedPaths)
+            .Must(path => path.StartsWith('/'))
+            .WithMessage($"'{RequestLoggingOptions.SectionName}:{nameof(RequestLoggingOptions.ExcludedPaths)}' entries must each start with '/'.");
+    }
 }

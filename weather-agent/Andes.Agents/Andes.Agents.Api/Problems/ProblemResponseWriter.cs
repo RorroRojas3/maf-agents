@@ -13,7 +13,8 @@ internal static class ProblemResponseWriter
         string? type,
         string? detail,
         CancellationToken cancellationToken,
-        Exception? exception = null)
+        Exception? exception = null,
+        IReadOnlyDictionary<string, string[]>? errors = null)
     {
         if (httpContext.Response.HasStarted || cancellationToken.IsCancellationRequested)
         {
@@ -24,17 +25,24 @@ internal static class ProblemResponseWriter
 
         IProblemDetailsService problemDetailsService = httpContext.RequestServices.GetRequiredService<IProblemDetailsService>();
 
+        ProblemDetails problemDetails = new()
+        {
+            Status = status,
+            Title = title,
+            Type = type,
+            Detail = detail,
+        };
+
+        if (errors is not null)
+        {
+            problemDetails.Extensions["errors"] = errors;
+        }
+
         await problemDetailsService.TryWriteAsync(new ProblemDetailsContext
         {
             HttpContext = httpContext,
             Exception = exception,
-            ProblemDetails = new ProblemDetails
-            {
-                Status = status,
-                Title = title,
-                Type = type,
-                Detail = detail,
-            },
+            ProblemDetails = problemDetails,
         });
     }
 }

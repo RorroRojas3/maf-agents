@@ -10,7 +10,6 @@ internal static class CoreServicesConfiguration
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<ICallerContext, HttpCallerContext>();
         services.AddSingleton<IPromptTemplateLoader, PromptTemplateLoader>();
-        services.AddValidation();
 
         return services;
     }

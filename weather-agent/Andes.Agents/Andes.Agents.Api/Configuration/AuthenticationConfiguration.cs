@@ -1,5 +1,7 @@
 using Andes.Agents.Api.Options;
 using Andes.Agents.Common.Constants;
+using Andes.Agents.Common.Validation;
+using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Identity.Web;
 
@@ -11,19 +13,12 @@ internal static class AuthenticationConfiguration
     {
         IConfigurationSection section = configuration.GetSection(AzureAdOptions.SectionName);
 
+        services.AddSingleton<IValidator<AzureAdOptions>, AzureAdOptionsValidator>();
+
         services
             .AddOptions<AzureAdOptions>()
             .Bind(section)
-            .ValidateDataAnnotations()
-            .Validate(
-                options => options.HasAuthority(),
-                $"{AzureAdOptions.SectionName}:{nameof(AzureAdOptions.Authority)}, or "
-                + $"{AzureAdOptions.SectionName}:{nameof(AzureAdOptions.Instance)} and {AzureAdOptions.SectionName}:{nameof(AzureAdOptions.TenantId)}, must be set.")
-            .Validate(
-                options => options.HasCallerRequirement(),
-                $"{AzureAdOptions.SectionName}:{nameof(AzureAdOptions.Scopes)} or {AzureAdOptions.SectionName}:{nameof(AzureAdOptions.AppPermissions)} "
-                + $"must name what callers need, or {AzureAdOptions.SectionName}:{nameof(AzureAdOptions.AllowAnyAuthenticatedCaller)} must be true "
-                + "to accept any token issued for this API.")
+            .ValidateWithFluentValidation()
             .ValidateOnStart();
 
         services.AddHttpContextAccessor();

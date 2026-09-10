@@ -5,6 +5,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Andes.Agents.Dto\Andes.Agents.Dto.csproj" />
+    <ProjectReference Include="..\Andes.Agents.Repository\Andes.Agents.Repository.csproj" />
     <ProjectReference Include="..\Andes.Agents.Service\Andes.Agents.Service.csproj" />
   </ItemGroup>
 
@@ -22,6 +24,7 @@
     <PackageReference Include="Microsoft.Identity.Web" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <PackageReference Include="Scalar.AspNetCore" />
+    <PackageReference Include="FluentValidation" />
   </ItemGroup>
 
 </Project>

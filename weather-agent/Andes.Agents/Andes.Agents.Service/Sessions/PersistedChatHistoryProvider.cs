@@ -2,6 +2,7 @@ using System.Text.Json;
 using Andes.Agents.Common.Constants;
 using Andes.Agents.Entity.Sessions;
 using Andes.Agents.Repository.Sessions;
+using Andes.Agents.Repository.Sessions.Interfaces;
 using Andes.Agents.Service.Options;
 using Andes.Agents.Service.Serialization;
 using Microsoft.Agents.AI;
@@ -10,12 +11,12 @@ using Microsoft.Extensions.Options;
 
 namespace Andes.Agents.Service.Sessions;
 
-/// <summary>Stores one Cosmos DB document per message and replays the most recent ones before each turn.</summary>
+/// <summary>Stores one document per message and replays the most recent ones before each turn.</summary>
 /// <remarks>
-/// A session must be bound by <see cref="CosmosAgentSessionStore"/> before its first turn; an unbound
+/// A session must be bound by <see cref="PersistedAgentSessionStore"/> before its first turn; an unbound
 /// session fails rather than writing under an id no protocol continuation could ever find again.
 /// </remarks>
-public sealed class CosmosChatHistoryProvider(
+public sealed class PersistedChatHistoryProvider(
     ISessionMessageRepository messages,
     IOptions<SessionsOptions> options,
     TimeProvider timeProvider) : ChatHistoryProvider

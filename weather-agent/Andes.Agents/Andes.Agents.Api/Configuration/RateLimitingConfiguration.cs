@@ -3,6 +3,8 @@ using System.Threading.RateLimiting;
 using Andes.Agents.Api.Options;
 using Andes.Agents.Api.Problems;
 using Andes.Agents.Common.Constants;
+using Andes.Agents.Common.Validation;
+using FluentValidation;
 using Microsoft.Extensions.Options;
 
 namespace Andes.Agents.Api.Configuration;
@@ -11,10 +13,12 @@ internal static class RateLimitingConfiguration
 {
     public static IServiceCollection AddAndesRateLimiting(this IServiceCollection services, IConfiguration configuration)
     {
+        services.AddSingleton<IValidator<RateLimitingOptions>, RateLimitingOptionsValidator>();
+
         services
             .AddOptions<RateLimitingOptions>()
             .Bind(configuration.GetSection(RateLimitingOptions.SectionName))
-            .ValidateDataAnnotations()
+            .ValidateWithFluentValidation()
             .ValidateOnStart();
 
         services.AddRateLimiter(limiter =>

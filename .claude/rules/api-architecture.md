@@ -1,32 +1,36 @@
 ---
 paths:
-  - "weather-agent/**"
+  - "**/*.cs"
+  - "**/*.csproj"
 ---
 
 # API architecture
 
-<!-- Portable: the body uses placeholders only. To adopt in another repository, copy this file, change `paths:` above, and replace the "This repository" appendix at the end. -->
+<!-- Portable: this file names no repository. Copy it into any .NET solution shaped Api → Service → Repository → Entity and it applies as written. Record a solution's own folder map, sanctioned deviations and adopted names in that repository's project memory, not here. -->
 
 Where a file goes and what it is called, for a .NET minimal-API solution shaped `<Root>.Api → <Root>.Service → <Root>.Repository → <Root>.Entity`, plus `<Root>.Dto` and `<Root>.Common`, tested by `<Root>.Unit.Test` and `<Root>.Integration.Test`.
 
-Placeholders: `<Root>` = solution prefix (`Contoso.Shop`); `<Feature>` = plural noun (`Orders`, `Documents`); `<Entity>` = singular (`Order`); `<Technique>` = gerund or mass noun for a sub-pipeline a feature owns (`Extraction`, `Tokenization`); `<Area>` = an options section (`Export`, `Telemetry`); `<Prefix>` = one fixed product word used on infrastructure DI methods (`AddContoso…`).
+Placeholders: `<Root>` = solution prefix (`Contoso.Shop`); `<Feature>` = plural noun (`Orders`, `Documents`); `<Entity>` = singular (`Order`); `<Provider>` = a persistence technology (`Sql`, `Mongo`, `Blob`); `<Technique>` = gerund or mass noun for a sub-pipeline a feature owns (`Extraction`, `Tokenization`); `<Area>` = an options section (`Export`, `Telemetry`); `<Prefix>` = one fixed product word used on infrastructure DI methods (`AddContoso…`).
 
 ## Layering
 
-- Project references: `Api → Service → Repository → Entity → Common`, `Dto → Common`, and `Repository → Dto` (EF configurations read validation rule constants from the action DTOs); `Entity` never references `Dto`; `Common` references nothing.
+- Project references: `Api → Service → Repository → Entity → Common`, `Dto → Common`, and `Service → Dto`. `Entity` and `Repository` never reference `Dto`; `Common` references no project.
+- **The composition root declares what it names.** `Api` carries a `ProjectReference` to every project whose types appear in its source — commonly `Service`, `Repository` and `Dto` — because it registers them. Transitive flow is never relied on to make a type compile.
 - No `Abstractions` project, no controllers, no AutoMapper. Interfaces live with their implementations; mapping is hand-written static classes.
+- **A `Service` type is never named after a storage technology.** `<Provider>` words appear only inside `Repository/<Provider>/`. A service that persists through `I<Entity>Repository` is named for what it does (`PersistedCartStore`), not for the store behind it (`RedisCartStore`).
 
 ## Rules that apply everywhere
 
-- **Namespace == path under `RootNamespace`.** `<Root>.Service/Documents/Extraction/X.cs` declares `namespace <Root>.Service.Documents.Extraction;`. Moving a file changes its namespace and nothing else. `Program.cs` declares no namespace.
+- **Namespace == path under `RootNamespace`.** `<Root>.Service/Documents/Extraction/X.cs` declares `namespace <Root>.Service.Documents.Extraction;`. Moving a file changes its namespace and nothing else. `Program.cs` declares no namespace. Enforce it: `dotnet_style_namespace_match_folder = true` plus `dotnet_diagnostic.IDE0130.severity = warning`, which is severity-less by default and would otherwise let a moved file build clean.
 - **No loose `.cs` at a project root.** Every type is inside a folder.
 - **Grouped model files per leaf folder** `<Folder>/`: non-service classes → `<Folder>Classes.cs`; records → `<Folder>Records.cs`; structs and record structs → `<Folder>Structs.cs`; const-only static holders → `<Folder>Constants.cs`; exceptions → `<Folder>Exceptions.cs`. A static class with method bodies keeps its own file. Nested and private types stay nested. Enums never live here.
-- **Interfaces.** One implementation → same file as the implementation, file named after the implementation, interface declared first. Two or more implementations, or implementations that live in a subfolder → `<Feature>/Interfaces/I<Name>.cs`, one per file.
-- **Options.** `<Area>Options` classes, each with `public const string SectionName`. Read by Service → `Service/Options/`; read only by Api → `Api/Options/`. Registered in `Api/Configuration` with `AddOptions<T>().Bind(configuration.GetSection(T.SectionName)).Validate(...).ValidateOnStart()`. Never `Configure<T>`, never `*Settings`. Inside any namespace that contains an `Options` segment the folder shadows Microsoft's `Options` class: write `Microsoft.Extensions.Options.Options.Create(...)`.
+- **Interfaces.** One implementation → same file as the implementation, file named after the implementation, interface declared first. Two or more implementations, or implementations that live in a subfolder → `<Feature>/Interfaces/I<Name>.cs`, one per file. A nested namespace sees its parent, so an interface in `<Feature>/Interfaces/` needs no `using` for types in `<Feature>/` — adding one is an unnecessary-using error.
+- **Options.** `<Area>Options` classes, each with `public const string SectionName`. **Every project that reads options owns an `Options/` folder**, and the class lives in the lowest project that reads it — `Api/Options/` for host concerns, `Service/Options/` for business knobs, `Repository/<Provider>/Options/` for store settings. A project with provider folders puts each provider's options inside that provider's own `Options/`, never in a shared one, so a second store carries its configuration with it. Bind with `AddOptions<T>().Bind(configuration.GetSection(T.SectionName)).ValidateWithFluentValidation().ValidateOnStart()`. Never `Configure<T>`, never `*Settings`. Inside any namespace that contains an `Options` segment the folder shadows Microsoft's `Options` class: write `Microsoft.Extensions.Options.Options.Create(...)`.
+- **Validation is FluentValidation**, never DataAnnotations. One `AbstractValidator<T>` per validated type, declared **in the same file as the type it validates** — the one sanctioned exception to file-name-equals-type-name, alongside the interface rule. A validator is `internal` unless another project registers it. Cross-field rules go in the validator, not in a `.Validate(lambda, message)` call on the options builder.
 - **Enums** all live in `Common/Enums/`, one per file, named in the plural (`OrderStatuses`, not `OrderStatus`) so they never collide with an entity. A wire-name companion is `<Enum>Names` in the owning Service feature.
-- **Constants** (string and Guid catalogs, const-only) all live in `Common/Constants/`. Dto, Entity, Service and Api hold no enums and no catalogs.
-- **Exceptions.** Only `NotFoundException` and `ForbiddenException` are solution-wide (`Service/Exceptions/`). Every other exception goes in the `<Folder>Exceptions.cs` of the feature that throws it.
-- **Tests mirror source.** `tests/<Root>.Unit.Test/<ProjectShortName>/<Folder>/<Type>Tests.cs`, ProjectShortName ∈ {Api, Service, Repository, Entity, Dto, Common}. Integration tests are grouped by feature folder plus `Endpoints/`, `Health/`, `Middleware/`. `TestInfrastructure/` at each test project root holds every fixture, fake, builder and collection definition — no helper types beside tests, no `*Tests` class inside it. A behaviour-named file (`<Behaviour>Tests.cs`) is allowed only when there is no single subject type.
+- **Constants** (string and Guid catalogs, const-only) all live in `Common/Constants/`. Dto, Entity, Service and Api hold no enums and no catalogs. A validation limit both a DTO validator and a store configuration must agree on is a catalog in `Common/Constants/`, not a constant on either.
+- **Exceptions.** Every project that throws owns an `Exceptions/` folder or a `<Folder>Exceptions.cs` in the feature that throws. Only `NotFoundException` and `ForbiddenException` are solution-wide (`Service/Exceptions/`). **A provider exception never reaches Api untranslated**: `Repository/<Provider>/` throws a store-shaped exception, and the Service feature catches it and rethrows the domain exception the handler maps. Api's exception handler therefore names no Repository type, and swapping the store changes nothing above Service.
+- **Tests mirror source.** `tests/<Root>.Unit.Test/<ProjectShortName>/<Folder>/<Type>Tests.cs`, ProjectShortName ∈ {Api, Service, Repository, Entity, Dto, Common}. Integration tests are grouped by feature folder plus `Endpoints/`, `Health/`, `Middleware/`. `TestInfrastructure/` at each test project root holds every fixture, fake, builder and collection definition — no helper types beside tests, no `*Tests` class inside it. A behaviour-named file (`<Behaviour>Tests.cs`) is allowed only when there is no single subject type. The test stack itself is fixed in `csharp.md`.
 - **Shipped assets move with their code.** The csproj item and the `AppContext.BaseDirectory` constant that reads it change in the same commit. The output path is a deployment contract: use `Link` to keep it when the source folder moves. Glob a directory of like files (`Skills\**\*.md`, `Prompts\*.md`); enumerate a single file.
 
 ## Project layout
@@ -39,21 +43,23 @@ Placeholders: `<Root>` = solution prefix (`Contoso.Shop`); `<Feature>` = plural 
 ├─ appsettings.json  appsettings.sample.json
 ├─ Configuration/                   all dependency injection
 │  ├─ <Feature>Configuration.cs     internal static; Add<Feature>(this IServiceCollection[, IConfiguration]) — plural, so it never collides with an EF <Entity>Configuration
-│  ├─ <Concern>Configuration.cs     Add<Prefix><Concern> for Authentication, Cors, Persistence, KeyVault, DataProtection, ExceptionHandling…
+│  ├─ <Concern>Configuration.cs     Add<Prefix><Concern> for Authentication, Cors, KeyVault, DataProtection, ExceptionHandling…
 │  ├─ ConfigurationRecords.cs       records the registrations share
-│  └─ Providers/                    one <Provider>ProviderConfiguration.cs (+ <Provider>Defaults.cs) per external provider
+│  └─ Providers/                    one <Provider>ProviderConfiguration.cs (+ <Provider>Defaults.cs) per external model or API provider
 ├─ Endpoints/                       minimal-API modules
 │  └─ <Entity>Endpoints.cs          Map<Entity>Endpoints(this IEndpointRouteBuilder); internal static handlers
 ├─ ExceptionHandlers/               <Name>ExceptionHandler.cs, one IExceptionHandler per file
 ├─ Filters/                         <Name>EndpointFilter.cs — static factories (Require(...)), not IEndpointFilter types
-├─ Health/                          <Name>HealthCheck.cs, probes, HealthRegistration.cs
+├─ Health/                          <Name>HealthCheck.cs, probes, HealthRegistration.cs — the policy (names, tags, routes) even when a probe lives with its provider
 ├─ Middleware/                      <Name>Middleware.cs + <Name>Registration.cs + LoggerMessage partials
 ├─ Observability/                   telemetry enrichers and processors + TelemetryRegistration.cs
-├─ Options/                         <Area>Options.cs read only by Api (Telemetry, RequestLogging, KeyVault)
+├─ Options/                         <Area>Options.cs read only by Api (Telemetry, RequestLogging, KeyVault), each with its validator
 ├─ Problems/                        ProblemTypes.cs (wire contract), ProblemsStructs.cs, ProblemDetailsRegistration.cs
 ├─ Properties/                      launchSettings.json
 └─ Startup/                         <Name>Bootstrapper.cs — validators and bootstrappers that run after Build()
 ```
+
+Persistence is registered by calling the provider's own `Add<Prefix><Provider>Persistence` from `Program.cs`; `Api/Configuration/` holds no store wiring of its own.
 
 ### `<Root>.Service`
 
@@ -67,7 +73,7 @@ Placeholders: `<Root>` = solution prefix (`Contoso.Shop`); `<Feature>` = plural 
 │  ├─ <Feature>Records.cs           every top-level record of this folder
 │  ├─ <Feature>Structs.cs           every struct and record struct of this folder
 │  ├─ <Feature>Constants.cs         const-only static holders of this folder
-│  ├─ <Feature>Exceptions.cs        every exception only this feature throws
+│  ├─ <Feature>Exceptions.cs        every exception only this feature throws, including the ones it translates store faults into
 │  ├─ Interfaces/                   only when an interface has 2+ implementations or they live in a subfolder
 │  │  └─ I<Name>.cs
 │  └─ <Technique>/                  a sub-pipeline the feature owns; the same file rules apply recursively
@@ -78,7 +84,7 @@ Placeholders: `<Root>` = solution prefix (`Contoso.Shop`); `<Feature>` = plural 
 ├─ Caching/                         <Subject>Cache.cs (I<Subject>Cache in the same file); CachingClasses/Structs.cs
 ├─ Exceptions/                      NotFoundException.cs, ForbiddenException.cs — nothing else
 ├─ Observability/                   metrics and tracing statics
-├─ Options/                         <Area>Options.cs, each with public const string SectionName
+├─ Options/                         <Area>Options.cs, each with public const string SectionName and its validator
 ├─ Prompts/                         PromptTemplateLoader.cs + shipped *.md templates
 ├─ Security/                        caller identity, secret protection
 ├─ Serialization/                   converters and serializer settings
@@ -87,13 +93,25 @@ Placeholders: `<Root>` = solution prefix (`Contoso.Shop`); `<Feature>` = plural 
 
 ### `<Root>.Repository`
 
+Provider-first: store-agnostic contracts sit at the top, and everything one technology needs sits in its own folder, so a second store is a sibling rather than a refactor.
+
 ```
 <Root>.Repository/
-├─ DbContexts/                      <RootShort>DbContext.cs; OnModelCreating applies every configuration explicitly
-├─ Configurations/                  IEntityTypeConfiguration<T>, mirroring the Entity folders
-│  └─ <Feature>/<Entity>Configuration.cs
-└─ Migrations/                      dotnet ef migrations add only; hand-edit nothing but CLR-name strings after a type move
+├─ <Feature>/                       store-agnostic; nothing here names a provider
+│  ├─ Interfaces/I<Entity>Repository.cs   one per file — the implementations live in a provider subfolder
+│  ├─ <Feature>Records.cs           read/result shapes the contract exposes (e.g. an entity plus its concurrency token)
+│  └─ <Feature>Exceptions.cs        store-shaped exceptions the contract documents, thrown by every provider
+└─ <Provider>/                      Sql/, Mongo/, Blob/ — everything one technology needs
+   ├─ <Provider>PersistenceConfiguration.cs   public static Add<Prefix><Provider>Persistence(IServiceCollection, IConfiguration)
+   ├─ <Provider>HealthCheck.cs      internal; exposed through Add<Prefix><Provider>HealthCheck(IHealthChecksBuilder, …)
+   ├─ <Provider>Queries.cs  <Provider>Records.cs  <Provider>Containers.cs   client, connection and query plumbing
+   ├─ Options/<Provider>DbOptions.cs          + its validator, in the same file
+   ├─ Serialization/                converters and serializer settings this store needs
+   ├─ DbContexts/  Configurations/  Migrations/   EF providers only: <RootShort>DbContext.cs, IEntityTypeConfiguration<T> mirroring the Entity folders, `dotnet ef migrations add` output
+   └─ <Feature>/<Provider><Entity>Repository.cs   the implementation, named for the store it talks to
 ```
+
+The provider folder owns its own DI, so the composition root sequences one call per store and holds no client construction. A non-EF store simply has no `DbContexts/`, `Configurations/` or `Migrations/`.
 
 ### `<Root>.Entity`
 
@@ -108,11 +126,13 @@ Placeholders: `<Root>` = solution prefix (`Contoso.Shop`); `<Feature>` = plural 
 ```
 <Root>.Dto/
 ├─ Actions/<Feature>/               folder is the plural of the file prefix
-│  └─ <Entity>Actions.cs            Create/Update/Delete<Entity>ActionDto + their FluentValidation validators (+ rule holders with methods)
+│  └─ <Entity>Actions.cs            Create/Update/Delete<Entity>ActionDto, List<Entities>ActionDto, and their FluentValidation validators
 ├─ <Feature>/                       response DTOs, one type family per file
 │  └─ <Entity>Dto.cs  <Entity><Child>Dto.cs
 └─ Pagination/                      PaginatedResponseDto.cs and other shapes every feature shares
 ```
+
+`List<Entities>ActionDto` is the query-parameter shape, bound with `[AsParameters]`. ASP.NET Core's built-in minimal-API validation (`AddValidation()`) reads **DataAnnotations only**, so in a FluentValidation solution it has nothing to act on and must not be registered — the endpoint attaches the validation filter instead. An endpoint that declares a validation response without attaching the filter is advertising a 400 it can never return.
 
 ### `<Root>.Common`
 
@@ -120,8 +140,11 @@ Placeholders: `<Root>` = solution prefix (`Contoso.Shop`); `<Feature>` = plural 
 <Root>.Common/
 ├─ Constants/                       <Catalog>.cs — const / static readonly string and Guid catalogs, no methods
 ├─ Enums/                           <Enums>.cs — one enum per file, plural name
-└─ Extensions/                      <Type>Extensions.cs — extension methods on BCL or Common types
+├─ Extensions/                      <Type>Extensions.cs — extension methods on BCL or Common types
+└─ Validation/                      the FluentValidation-to-IValidateOptions adapter and its OptionsBuilder extension
 ```
+
+`Validation/` sits here because every layer that registers options needs it and `Common` is the only project all of them share. It is the one place `Common` takes package references.
 
 ### Tests
 
@@ -136,7 +159,7 @@ tests/<Root>.Integration.Test/
 ├─ Endpoints/<Entity>EndpointsIntegrationTests.cs
 ├─ <Feature>/<Subject>IntegrationTests.cs
 ├─ Health/  Middleware/             infrastructure behaviour through the real pipeline
-└─ TestInfrastructure/              WebApplicationFactory subclass, auth handler, container fixtures, fakes, seeds
+└─ TestInfrastructure/              WebApplicationFactory subclass, auth handler, container fixtures, seeds
 ```
 
 ## Decision table — "You are adding…"
@@ -146,31 +169,40 @@ tests/<Root>.Integration.Test/
 | an endpoint module | `Api/Endpoints/` | `<Entity>Endpoints.cs`, `Map<Entity>Endpoints` |
 | a DI registration for a feature | `Api/Configuration/` | `<Feature>Configuration.cs`, `Add<Feature>(this IServiceCollection, IConfiguration)`; drop the `IConfiguration` parameter when the feature binds no options |
 | a DI registration for infrastructure | `Api/Configuration/`, or the owning `Api/{Health,Middleware,Observability,Problems}/` | `<Concern>Configuration.cs` / `<Concern>Registration.cs`, `Add<Prefix><Concern>` |
-| a per-provider registration | `Api/Configuration/Providers/` | `<Provider>ProviderConfiguration.cs`, `Add<Provider>Provider` |
-| an options class read by Service | `Service/Options/` | `<Area>Options.cs` with `SectionName` |
-| an options class read only by Api | `Api/Options/` | `<Area>Options.cs` with `SectionName` |
+| a per-provider registration for a model or external API | `Api/Configuration/Providers/` | `<Provider>ProviderConfiguration.cs`, `Add<Provider>Provider` |
+| **a persistence provider** | `Repository/<Provider>/` | the technology's proper name — `Sql/`, `Mongo/` |
+| **a persistence registration** | `Repository/<Provider>/` | `<Provider>PersistenceConfiguration.cs`, `Add<Prefix><Provider>Persistence` |
+| **a store health probe** | `Repository/<Provider>/` | `<Provider>HealthCheck.cs`, internal, plus `Add<Prefix><Provider>HealthCheck`; the name, tag and route stay in `Api/Health/` |
+| an options class read only by Api | `Api/Options/` | `<Area>Options.cs` with `SectionName` + validator |
+| an options class read by Service | `Service/Options/` | `<Area>Options.cs` with `SectionName` + validator |
+| **an options class read by a store** | `Repository/<Provider>/Options/` | `<Provider>DbOptions.cs` with `SectionName` + validator |
+| **a validator** | the file of the type it validates | `<Type>Validator : AbstractValidator<<Type>>` |
 | a service | `Service/<Feature>/` | `<Entity>Service.cs` (`I<Entity>Service` first) |
 | an interface with one implementation | the implementation's file | `I<Impl>` above `<Impl>` |
-| an interface with 2+ implementations | `Service/<Feature>/Interfaces/` | `I<Name>.cs` |
+| an interface with 2+ implementations, or one whose implementations live in a subfolder | `<Feature>/Interfaces/` | `I<Name>.cs` |
 | a mapper | `Service/<Feature>/` | `<Entity>Mapper.cs`, static, `MapTo<Entity>Dto` + `MapTo<Entity>DtoExpression` |
-| a request DTO or its validator | `Dto/Actions/<Feature>/` | `<Entity>Actions.cs`; `Create<Entity>ActionDto`, `Create<Entity>ActionDtoValidator` |
+| a request DTO or its validator | `Dto/Actions/<Feature>/` | `<Entity>Actions.cs`; `Create<Entity>ActionDto` + `Create<Entity>ActionDtoValidator`; `List<Entities>ActionDto` for query parameters |
 | a response DTO | `Dto/<Feature>/` | `<Entity>Dto.cs` |
 | an entity | `Entity/<Feature>/` | `<Entity>.cs` |
-| an EF configuration | `Repository/Configurations/<Feature>/` | `<Entity>Configuration.cs` |
-| a migration | `Repository/Migrations/` | `dotnet ef migrations add <Verb><Subject>` |
+| a repository contract | `Repository/<Feature>/Interfaces/` | `I<Entity>Repository.cs` |
+| a repository implementation | `Repository/<Provider>/<Feature>/` | `<Provider><Entity>Repository.cs` |
+| an EF configuration | `Repository/<Provider>/Configurations/<Feature>/` | `<Entity>Configuration.cs` |
+| a migration | `Repository/<Provider>/Migrations/` | `dotnet ef migrations add <Verb><Subject>` |
 | an enum | `Common/Enums/` | `<Enums>.cs`, plural |
 | an enum's wire names | `Service/<Feature>/` | `<Enum>Names.cs`, static |
 | a constant catalog | `Common/Constants/` | `<Catalog>.cs` (`PermissionIds`, `TelemetryNames`) |
 | a record / struct / non-service class | the leaf folder's grouped file | `<Folder>Records.cs` / `<Folder>Structs.cs` / `<Folder>Classes.cs` |
 | a feature exception | `Service/<Feature>/` (or its `<Technique>/`) | `<Folder>Exceptions.cs` |
+| a store exception | `Repository/<Feature>/` | `<Folder>Exceptions.cs`; Service translates it before it reaches Api |
 | a solution-wide exception | `Service/Exceptions/` | only `NotFoundException`, `ForbiddenException` |
 | a static helper with method bodies | beside its callers | own file, named for what it does (`<Subject>Sql.cs`, `<Subject>Calculator.cs`) |
 | a background job | `Service/BackgroundJobs/` (shared) or `Service/<Feature>/` (feature-owned) | `<Subject>Processor.cs`, `<Subject>Queue.cs` |
 | a cache | `Service/Caching/` | `<Subject>Cache.cs` with `I<Subject>Cache`; `<Subject>CacheOptions` in `Service/Options/` |
 | a shipped asset (prompt, template, font) | beside the code that reads it | kebab-case file; csproj `<None>` + `Link`; `AppContext.BaseDirectory` constant |
 | a middleware | `Api/Middleware/` | `<Name>Middleware.cs` + `<Name>Registration.cs` |
+| an endpoint filter | `Api/Filters/` | `<Name>EndpointFilter.cs`, static `Require(...)` factory |
 | an exception handler | `Api/ExceptionHandlers/` | `<Name>ExceptionHandler.cs` |
-| a health check | `Api/Health/` | `<Name>HealthCheck.cs`; registered in `HealthRegistration.cs` |
+| a health check | `Api/Health/` (or the owning `Repository/<Provider>/`) | `<Name>HealthCheck.cs`; registered in `HealthRegistration.cs` |
 | a startup validator | `Api/Startup/` | `<Name>Bootstrapper.cs` |
 | a unit test | `tests/<Root>.Unit.Test/<ProjectShortName>/<Folder>/` | `<Type>Tests.cs` |
 | an integration test | `tests/<Root>.Integration.Test/<Feature>/` or `Endpoints/` | `<Subject>IntegrationTests.cs` |
@@ -182,14 +214,17 @@ tests/<Root>.Integration.Test/
 |---|---|---|
 | Projects | `<Root>.<Layer>`; tests `<Root>.Unit.Test`, `<Root>.Integration.Test` | `Contoso.Shop.Service` |
 | Folders — collections of like types | plural | `Endpoints`, `Enums`, `Options`, `Configurations`, `<Feature>` |
-| Folders — techniques and infrastructure | gerund or mass noun | `Extraction`, `Caching`, `Middleware`, `Health`, `Observability`, `Configuration` |
-| File names | == the type name, except grouped files | `OrderService.cs`; `OrdersRecords.cs` |
+| Folders — techniques and infrastructure | gerund or mass noun | `Extraction`, `Caching`, `Middleware`, `Health`, `Observability`, `Configuration`, `Validation` |
+| Folders — persistence providers | the technology's proper name | `Sql`, `Mongo`, `Blob` |
+| File names | == the type name, except grouped files, and a validator beside the type it validates | `OrderService.cs`; `OrdersRecords.cs`; `ExportOptions.cs` holding `ExportOptionsValidator` |
 | Grouped files | `<Folder>Classes/Records/Structs/Constants/Exceptions.cs` | `ExtractionRecords.cs` |
 | Services | `<Entity>Service` / `I<Entity>Service` | `OrderService` |
+| Repositories | contract `I<Entity>Repository`; implementation `<Provider><Entity>Repository` | `IOrderRepository` / `SqlOrderRepository` |
 | Mappers | `<Entity>Mapper`, static | `OrderMapper` |
 | Options | `<Area>Options`, `SectionName` | `ExportOptions` |
+| Validators | `<Type>Validator` | `ExportOptionsValidator`, `CreateOrderActionDtoValidator` |
 | DI extension classes (Api) | `<Feature>Configuration` (plural) | `OrdersConfiguration` vs EF `OrderConfiguration` |
-| DI extension methods | `Add<Feature>` for features; `Add<Prefix><Thing>` for infrastructure | `AddOrders`; `Add<Prefix>Cors` |
+| DI extension methods | `Add<Feature>` for features; `Add<Prefix><Thing>` for infrastructure; `Add<Prefix><Provider><Concern>` for a store | `AddOrders`; `Add<Prefix>Cors`; `AddContosoSqlPersistence` |
 | `*Registration` | reserved for `Api/{Health,Middleware,Observability,Problems}` | `TelemetryRegistration` |
 | Endpoint modules | `<Entity>Endpoints`, `Map<Entity>Endpoints` | `OrderEndpoints` |
 | Filters | `<Name>EndpointFilter`, static `Require(...)` | `PermissionEndpointFilter` |
@@ -200,51 +235,19 @@ tests/<Root>.Integration.Test/
 | Enum wire names | `<Enum>Names` | `JobStatusNames` |
 | Actions | `Actions/<Feature>/<Entity>Actions.cs` | `Actions/Orders/OrderActions.cs` |
 | Exceptions | `<Condition>Exception`; grouped in `<Folder>Exceptions.cs` | `StorageNotConfiguredException` |
-| Tests | `<Type>Tests`, methods `Method_Scenario_Expected`; integration `<Subject>IntegrationTests` | `OrderServiceTests` |
+| Tests | `<Type>Tests`; integration `<Subject>IntegrationTests` | `OrderServiceTests` |
 | Fakes | `Fake<Name>` implementing `I<Name>` | `FakeGraphService` |
 | Shipped assets | kebab-case | `order-summary-prompt.md` |
 
 ## Never
 
-- No loose `.cs` at a project root; no `Models/`, `Helpers/`, `Utils/`, `Tool/`, `Settings/` or `Mappers/` folders in Service; no `Exceptions/` folder beyond the two shared types.
+- No loose `.cs` at a project root; no `Models/`, `Helpers/`, `Utils/`, `Tool/`, `Settings/` or `Mappers/` folders in Service; no `Exceptions/` folder in Service beyond the two shared types.
 - No controllers, no `MapControllers()`, no AutoMapper, no `Abstractions` project, no `*Settings` classes, no `Configure<T>`.
+- **No `Swashbuckle.AspNetCore`, `AddSwaggerGen`, `UseSwagger` or `UseSwaggerUI`** — the document comes from `Microsoft.AspNetCore.OpenApi` and the UI from Scalar.
+- **No `System.ComponentModel.DataAnnotations` validation** — no `[Required]`, `[Range]`, `[Url]`, no `ValidateDataAnnotations()`.
 - No enums or constant catalogs in Dto, Entity, Service or Api — they live in Common.
+- No provider name on a type outside `Repository/<Provider>/`; no provider-specific code in Service or Api, including client construction in the composition root.
+- No shared `Options/` or `Serialization/` folder at the Repository root when provider folders exist — each provider owns its own.
 - No interface-only file for a 1:1 pair; no file named after the interface when it also holds the implementation.
 - No test helper types outside `TestInfrastructure/`; no `*Tests` class inside it.
 - Never regenerate a migration to absorb a CLR rename; edit the type-name strings and verify with `dotnet ef migrations has-pending-model-changes`.
-
----
-
-## This repository — Andes.Agents
-
-`<Root>` = `Andes.Agents`; `<Prefix>` = `Andes` (`AddAndesKeyVault`, `AddAndesTelemetry`, `AddAndesAuthentication`, `AddAndesCors`, `AddAndesRateLimiting`, `AddAndesProblemDetails`, `AddAndesExceptionHandling`, `AddAndesHealthChecks`, `AddAndesOpenApi`, `AddAndesAzureCredential`, `AddAndesPersistence`); `AddCoreServices` registers the clock, the caller context, the prompt loader and minimal-API validation. The solution lives at `weather-agent/Andes.Agents/Andes.Agents.slnx`; `Directory.Build.props` and `Directory.Packages.props` beside it hold the shared settings and every package version.
-
-**Folders per project**
-
-| Project | Folders |
-|---|---|
-| Api | `Endpoints/{Agent,Session}Endpoints.cs` + `WeatherAgentCard.cs`; `Configuration/{Agents,Authentication,AzureCredential,CoreServices,Cors,ExceptionHandling,ForwardedHeaders,KeyVault,OpenApi,Persistence,RateLimiting,Sessions,Weather}Configuration.cs` + `AzureCredentials.cs` + `Providers/{MicrosoftFoundry,AzureOpenAI}ProviderConfiguration.cs` + `Providers/OpenAIChatClientFactory.cs`; `ExceptionHandlers/GlobalExceptionHandler.cs`; `Health/`; `Middleware/RequestLogging{Middleware,Registration}.cs`; `Observability/{TelemetryRegistration,RequestDescriptor}.cs`; `Options/{AgentCard,ApiDocs,Azure,AzureAd,AzureOpenAI,Cors,CosmosDb,KeyVault,MicrosoftFoundry,OpenAIEndpoint,RateLimiting,RequestLogging,Telemetry}Options.cs`; `Problems/{ProblemTypes,ProblemDetailsRegistration,ProblemResponseWriter}.cs`; `Startup/CosmosBootstrapper.cs` |
-| Service | `Agents/UsageRecordingAgent.cs`; `Sessions/{CosmosAgentSessionStore,CosmosChatHistoryProvider,SessionService,SessionMapper,SessionIdValidator,SessionsExceptions}.cs`; `Weather/{WeatherService,WeatherRecords}.cs` + `Weather/Tools/WeatherToolProvider.cs`; cross-cutting `Exceptions`, `Options`, `Prompts`, `Security`, `Serialization` |
-| Repository | `Cosmos/{CosmosContainers,CosmosQueries,CosmosRecords,CosmosResourceProvisioner,PartitionKeys}.cs`; `Sessions/{SessionRepository,SessionMessageRepository,SessionsRecords,SessionsExceptions}.cs`; `Serialization/{RepositoryJsonOptions,UtcDateTimeOffsetJsonConverter}.cs` |
-| Entity | `Sessions/SessionsRecords.cs` (Cosmos documents and the state-bag records) |
-| Dto | `Actions/Sessions/SessionActions.cs`; `Sessions/`; `Pagination/` |
-| Common | `Constants/{AgentNames,AuthorizationPolicies,ChatClientKeys,ClaimTypeNames,PromptNames,RateLimitPolicies,SessionIdRules,SessionStateKeys,TelemetryNames,WeatherLimits}.cs` |
-
-**Sanctioned deviations**
-
-- **No EF Core.** The only store is Azure Cosmos DB through the raw SDK, so `Repository/` carries `Cosmos/`, `Sessions/` and `Serialization/` in place of `DbContexts/`, `Configurations/` and `Migrations/`. Options the repositories need arrive as the `CosmosContainerNames` record, registered by `AddAndesPersistence` from `Api/Options/CosmosDbOptions.cs`; `Repository/` holds no options class.
-- **The prompt is an embedded resource**, not a shipped `<None>` asset: `Service/Prompts/weather-agent-instructions.md` is read by `PromptTemplateLoader` through its logical name in `Common/Constants/PromptNames.cs`.
-- **Routes are wire contracts.** The `Sessions` feature is served at `api/conversations` by `SessionEndpoints`; the A2A and AG-UI hosts live in `AgentEndpoints` at `weather/a2a` and `weather/ui`, and the agent card at `/.well-known/agent-card.json`.
-- **`Api/Options/OpenAIEndpointOptions.cs` is an abstract base, not a section.** `MicrosoftFoundryOptions` and `AzureOpenAIOptions` derive from it and carry the `SectionName`; the base holds the endpoint contract both providers validate.
-- **One exception handler, not one per condition.** `ExceptionHandlers/GlobalExceptionHandler.cs` maps every exception in a single switch expression, so adding a domain exception means adding an arm there and a type to `Problems/ProblemTypes.cs`.
-- **`Problems/ProblemTypes.cs` stays in Api** as the rule's own layout lists it; every other constant catalog is in `Common/Constants/`.
-
-**Sanctioned names** — `Session` is the domain word for a conversation (`SessionDocument`, `SessionService`, `SessionEndpoints`); `Conversation` appears only in the route and in `ConversationBusyException`, which mirrors the `conversation-busy` problem type. `Chat` means the model client or wire role (`ChatClientKeys`, `CosmosChatHistoryProvider`).
-
-**Tests** — none yet. When they arrive they follow the layout above under `weather-agent/Andes.Agents/tests/`.
-
-```bash
-# from the repo root
-dotnet build weather-agent/Andes.Agents/Andes.Agents.slnx
-dotnet format weather-agent/Andes.Agents/Andes.Agents.slnx --verify-no-changes
-```

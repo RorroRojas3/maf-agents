@@ -2,7 +2,7 @@ using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace Andes.Agents.Repository.Serialization;
+namespace Andes.Agents.Repository.Cosmos.Serialization;
 
 /// <summary>Writes timestamps as fixed-width UTC (<c>yyyy-MM-ddTHH:mm:ss.fffffffZ</c>) so Cosmos DB can order them as strings.</summary>
 public sealed class UtcDateTimeOffsetJsonConverter : JsonConverter<DateTimeOffset>

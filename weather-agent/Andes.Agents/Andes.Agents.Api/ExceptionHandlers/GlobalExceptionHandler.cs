@@ -1,8 +1,8 @@
-using System.ComponentModel.DataAnnotations;
 using Andes.Agents.Api.Observability;
 using Andes.Agents.Api.Problems;
 using Andes.Agents.Service.Exceptions;
 using Andes.Agents.Service.Sessions;
+using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics;
 
 namespace Andes.Agents.Api.ExceptionHandlers;
@@ -47,14 +47,17 @@ internal sealed partial class GlobalExceptionHandler(ILogger<GlobalExceptionHand
             LogExpected(method, route, problem.Status, exception.GetType().Name);
         }
 
-        await ProblemResponseWriter.WriteAsync(httpContext, problem.Status, problem.Title, problem.Type, problem.Detail, cancellationToken, exception);
+        await ProblemResponseWriter.WriteAsync(httpContext, problem.Status, problem.Title, problem.Type, problem.Detail, cancellationToken, exception, problem.Errors);
 
         return true;
     }
 
     private static ProblemDescription Describe(Exception exception) => exception switch
     {
-        ValidationException or InvalidSessionIdException =>
+        // The failures go in the body, never in the log line: they quote what the caller sent.
+        ValidationException validation =>
+            new(StatusCodes.Status400BadRequest, "The request is not valid", ProblemTypes.ValidationError, "One or more parameters are not valid.", ToErrors(validation)),
+        InvalidSessionIdException =>
             new(StatusCodes.Status400BadRequest, "The request is not valid", ProblemTypes.ValidationError, exception.Message),
         ForbiddenException =>
             new(StatusCodes.Status403Forbidden, "Forbidden", ProblemTypes.Forbidden, exception.Message),
@@ -77,5 +80,15 @@ internal sealed partial class GlobalExceptionHandler(ILogger<GlobalExceptionHand
     [LoggerMessage(Level = LogLevel.Debug, Message = "{Method} {Route} was abandoned by the caller.")]
     private partial void LogAbandoned(string method, string route);
 
-    private readonly record struct ProblemDescription(int Status, string Title, string? Type, string? Detail);
+    private static Dictionary<string, string[]> ToErrors(ValidationException exception) =>
+        exception.Errors
+            .GroupBy(failure => failure.PropertyName, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Select(failure => failure.ErrorMessage).ToArray(), StringComparer.Ordinal);
+
+    private sealed record ProblemDescription(
+        int Status,
+        string Title,
+        string? Type,
+        string? Detail,
+        IReadOnlyDictionary<string, string[]>? Errors = null);
 }

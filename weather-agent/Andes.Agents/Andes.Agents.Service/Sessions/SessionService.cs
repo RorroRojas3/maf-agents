@@ -2,6 +2,7 @@ using Andes.Agents.Dto.Pagination;
 using Andes.Agents.Dto.Sessions;
 using Andes.Agents.Entity.Sessions;
 using Andes.Agents.Repository.Sessions;
+using Andes.Agents.Repository.Sessions.Interfaces;
 using Andes.Agents.Service.Exceptions;
 using Andes.Agents.Service.Security;
 

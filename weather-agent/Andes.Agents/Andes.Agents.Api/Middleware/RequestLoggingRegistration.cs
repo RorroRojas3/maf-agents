@@ -1,4 +1,6 @@
 using Andes.Agents.Api.Options;
+using Andes.Agents.Common.Validation;
+using FluentValidation;
 
 namespace Andes.Agents.Api.Middleware;
 
@@ -6,15 +8,12 @@ internal static class RequestLoggingRegistration
 {
     public static IServiceCollection AddAndesRequestLogging(this IServiceCollection services, IConfiguration configuration)
     {
+        services.AddSingleton<IValidator<RequestLoggingOptions>, RequestLoggingOptionsValidator>();
+
         services
             .AddOptions<RequestLoggingOptions>()
             .Bind(configuration.GetSection(RequestLoggingOptions.SectionName))
-            .ValidateDataAnnotations()
-            // A prefix without its leading slash makes PathString throw on every request, and a blank one
-            // matches everything; data annotations cannot see inside the array.
-            .Validate(
-                options => Array.TrueForAll(options.ExcludedPaths, path => path.StartsWith('/')),
-                $"{RequestLoggingOptions.SectionName}:{nameof(RequestLoggingOptions.ExcludedPaths)} entries must each start with '/'.")
+            .ValidateWithFluentValidation()
             .ValidateOnStart();
 
         return services;

@@ -1,5 +1,7 @@
 using Andes.Agents.Api.Options;
 using Andes.Agents.Common.Constants;
+using Andes.Agents.Common.Validation;
+using FluentValidation;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Options;
 using OpenAI.Responses;
@@ -10,13 +12,12 @@ internal static class AzureOpenAIProviderConfiguration
 {
     public static IServiceCollection AddAzureOpenAIProvider(this IServiceCollection services, IConfiguration configuration)
     {
+        services.AddSingleton<IValidator<AzureOpenAIOptions>, AzureOpenAIOptionsValidator>();
+
         services
             .AddOptions<AzureOpenAIOptions>()
             .Bind(configuration.GetSection(AzureOpenAIOptions.SectionName))
-            .ValidateDataAnnotations()
-            .Validate(
-                options => options.HasV1Route(),
-                $"{AzureOpenAIOptions.SectionName}:{nameof(OpenAIEndpointOptions.Endpoint)} must end with '{OpenAIEndpointOptions.V1RoutePath}'.")
+            .ValidateWithFluentValidation()
             .ValidateOnStart();
 
         services.AddKeyedSingleton<IChatClient>(ChatClientKeys.AzureOpenAI, (provider, _) =>
