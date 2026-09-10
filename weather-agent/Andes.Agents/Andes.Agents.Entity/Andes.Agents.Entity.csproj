@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Andes.Agents.Common\Andes.Agents.Common.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Andes.Agents.Dto\Andes.Agents.Dto.csproj" />
+    <ProjectReference Include="..\Andes.Agents.Repository\Andes.Agents.Repository.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- IHttpContextAccessor for the caller context; nothing else from ASP.NET Core is used here. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Agents.AI" />
+    <PackageReference Include="Microsoft.Agents.AI.Hosting" />
+    <PackageReference Include="Microsoft.Extensions.AI" />
+    <PackageReference Include="FluentValidation" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Prompts\*.md" LogicalName="Prompts/%(Filename)%(Extension)" />
+  </ItemGroup>
+
+</Project>

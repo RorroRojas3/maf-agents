@@ -1,29 +1,70 @@
 # CLAUDE.md
 
-Project memory for **maf-agents** — runnable **Microsoft Agent Framework** agent examples in **C#/.NET**. It loads automatically every session and governs how Claude Code works here.
+Project memory for **maf-agents** — agents built with the [Microsoft Agent Framework](https://learn.microsoft.com/agent-framework/) in C# / .NET. It loads automatically every session and governs how Claude Code works in this repository.
 
-Layout: detailed C# standards in `.claude/rules/csharp.md` auto-apply to `*.cs`; skills and subagents live under `.claude/`; `settings.json` pins the model and reasoning effort (`"effortLevel": "xhigh"`); the root `CHANGELOG.md` is the running record of changes, owned by the `se-technical-writer` subagent.
+This file lives at `.claude/CLAUDE.md`, **not** the repo root. Detailed standards in `.claude/rules/` auto-apply by file path; skills and subagents live under `.claude/`; `settings.json` pins `model: opus`, `effortLevel: xhigh`, and ten official plugins.
 
-## This repo
+## About this repository
 
-Every sample is a self-contained, runnable console app that demonstrates one Microsoft Agent Framework concept.
+The purpose is to build and explore agents with the Microsoft Agent Framework on .NET. One solution exists, `weather-agent/Andes.Agents/Andes.Agents.slnx`, and it is a working ASP.NET Core host for a **weather agent** — read `docs/README.md` for the engineer-facing reference and `CHANGELOG.md` for what shipped.
 
-```
-samples/<NN-category>/<SampleName>/     # e.g. samples/01-get-started/HelloAgent/
-```
+An earlier shape of this repo — console samples under `samples/<NN-category>/` (`HelloAgent`, `ImageAgent`), two ADRs, a shared `config/appsettings.sample.json` and a root `maf-agents.slnx` — lives on `origin/main` and is **not present on this branch**. `git show origin/main:<path>` reads any of it. Its ADRs established two conventions this branch keeps: Foundry is reached through the OpenAI SDK on the resource's `/openai/v1/` route with an API key, and stable packages are preferred — with one recorded exception below.
 
-Categories mirror the official Agent Framework sample taxonomy: `01-get-started`, `02-agents`, `03-workflows`, `04-hosting`, `05-end-to-end`. Each sample folder carries its own `README.md` covering what it shows, prerequisites, and how to run it.
+### `weather-agent/Andes.Agents/` — the only code
 
-**Stable packages only — never pass `--prerelease`.** This is a standing constraint, not a default to be improved on. It is the reason samples use the OpenAI provider rather than Microsoft Foundry: as of `Microsoft.Agents.AI` 1.17.0 the core framework is GA, but `Microsoft.Agents.AI.Foundry`, `Azure.AI.Projects`, and every `Azure.AI.OpenAI` past 2.1.0 ship prerelease only. If a task seems to need a prerelease package, raise it with the user rather than adding one.
+Six projects, `Api → Service → Repository → Entity → Common` plus `Dto` (`Dto → Common`; `Service` references `Dto`, **`Repository` does not**), laid out exactly as `.claude/rules/api-architecture.md` prescribes. That rule is portable and names no repository; this file is where **this** solution's folder map, deviations and adopted names live — see "How this solution instantiates the architecture rule" below. `Api` is the composition root and declares a `ProjectReference` to every project it names — `Service`, `Repository` and `Dto` — rather than reaching them transitively.
 
-**Provider:** OpenAI direct, via `Microsoft.Agents.AI.OpenAI`. Prefer the Responses client (`client.GetResponsesClient()`) over Chat Completions — it carries the full hosted-tool surface.
+- **What it does.** Entra ID bearer auth on every route (Microsoft.Identity.Web); the agent exposed over **A2A** (HTTP+JSON and JSON-RPC at `/weather/a2a`, card at `/.well-known/agent-card.json`) and **AG-UI** (`/weather/ui`); sessions and messages in **Azure Cosmos DB** under the hierarchical key `[/userId, /sessionId]` (Entra `oid` + A2A `contextId` / AG-UI `threadId`); `api/conversations` for a caller's own sessions; OpenTelemetry → Azure Monitor with `gen_ai.*` spans; Key Vault when enabled; Scalar over the OpenAPI document; per-caller rate limiting; CORS allow-list; RFC 9457 problem details everywhere.
+- **Model.** Two keyed `IChatClient` registrations reach the same Azure AI Foundry resource on its OpenAI-compatible `/openai/v1/` route, and `Api/Options/OpenAIEndpointOptions.cs` is the shared base that validates that route. **`AzureOpenAI` (required) is the Responses client that drives the agent** — deployment `rrp-gpt-5.6-luna`, stored output **disabled** so Cosmos is the only conversation state. **`MicrosoftFoundry` (optional) is the Chat Completions client** — a blank `Endpoint` registers nothing rather than failing startup, and nothing consumes it yet. Both go through `OpenAIChatClientFactory.Decorate`: `FunctionInvokingChatClient → OpenTelemetryChatClient`. The agent adds `OpenTelemetryAgent → UsageRecordingAgent → ChatClientAgent` (`Api/Configuration/AgentsConfiguration.cs`). Options here expose a computed URI as `GetEndpointUri()`, a **method** rather than a property — originally because DataAnnotations reflected over every property and a blank endpoint threw out of the getter before the required-field message could be produced. FluentValidation evaluates only the rules it is given, so that constraint is gone; the method shape simply stayed.
+- **One exception handler and one request log.** `Api/ExceptionHandlers/GlobalExceptionHandler.cs` is the only `IExceptionHandler`: a switch expression maps each exception to its problem+json shape, 500s carry no `detail` and no domain `type`, and 499 is returned only when the caller actually aborted. `Api/Middleware/RequestLoggingMiddleware.cs` writes one line per request. Both name the request by its **matched route pattern** (`Api/Observability/RequestDescriptor.cs`), so an id in the path never reaches a sink.
+- **Weather data is a deterministic in-process stub** (`Service/Weather/WeatherService.cs`, owner decision): a fixed gazetteer, accent-insensitive search, seeded pseudo-random readings stable per place and local date. A real provider replaces the implementation behind `IWeatherService` without touching the tools.
+- **Packages.** Agent Framework core is GA `1.20.0`; the hosting packages (`Microsoft.Agents.AI.Hosting*`, `A2A.AspNetCore`) exist **only in preview** and are pinned exactly by owner decision (`docs/adr/0001-preview-hosting-packages.md`). `OpenAI` stays at 2.12.0 because `Microsoft.Extensions.AI.OpenAI` 10.9.0 rejects 2.13. The Cosmos SDK's build check demands an explicit `Newtonsoft.Json` pin even though the app serializes with System.Text.Json.
+- **Verified so far:** `dotnet build` (warnings as errors), `dotnet format --verify-no-changes`, and a smoke run with fake configuration — liveness, the anonymous card, 401/404 problem+json, OpenAPI/Scalar, forwarded-proto, the auth startup guard. **Not yet verified end to end:** a real agent turn over AG-UI/A2A, the Cosmos writes, the 409 on concurrent turns, App Insights spans. `docs/operations/runbook.md` has the steps.
 
-**Central package management:** every version lives in `Directory.Packages.props`. A `PackageReference` in a `.csproj` carries no `Version` attribute.
+### Invariants worth knowing before changing the session code
 
-Two deliberate carve-outs from the standards below — deviations by decision, not oversight:
+- The session store scopes every lookup by the caller's `oid` itself and is registered with `withIsolation: false`; the framework's isolation wrapper is deliberately **not** layered on top (its composed `"{key}::{id}"` string cannot be split into the two partition-key halves).
+- Message ids are `{sessionId}:{sequence:D8}` and the session document is replaced with `IfMatchEtag`: two concurrent turns on one session end in a **409 `conversation-busy`**, never a silent overwrite, and the loser writes nothing. A turn that stored its messages but never saved the session is healed at the next lookup from `MAX(c.sequence)` — one cheap query per turn.
+- `AzureAd:Scopes` or `AzureAd:AppPermissions` must be configured or startup throws (`AzureAdOptions.HasCallerRequirement`); `AzureAd:AllowAnyAuthenticatedCaller` is the explicit opt-out that `appsettings.Development.json` sets. Any app in the tenant can obtain a token for the audience — only a scope or app role proves it was granted access.
+- **Nothing a caller supplied may reach a log sink.** No bodies, no prompts, no message text, no query values, and never the `oid`. Prompt capture on spans is off in every environment; `Telemetry:EnableSensitiveData` or `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true` is the deliberate opt-in. A caller correlates a failure by the `traceId` on the problem response, which is the Application Insights operation id.
+- `Session` is the domain word; `Conversation` appears only in the wire route and the `conversation-busy` problem type. `Chat` means the model client or wire role. A Service type that persists is `Persisted<Thing>` — never `Cosmos<Thing>`, which names a store Service cannot see.
+- **`Repository` is provider-first and owns Cosmos end to end.** Store-agnostic contracts sit in `Repository/Sessions/Interfaces/`; everything Cosmos-specific — client construction, options, serializer, health probe, repositories — sits under `Repository/Cosmos/` and is registered by `AddAndesCosmosPersistence`. `Microsoft.Azure.Cosmos` must resolve in exactly one project; a second store is a sibling folder, not a refactor.
+- **Validation is FluentValidation everywhere**, DataAnnotations nowhere. Each validated type carries its `AbstractValidator<T>` in the same file; options bind with `.ValidateWithFluentValidation().ValidateOnStart()` against the adapter in `Common/Validation/`. The built-in `AddValidation()` is DataAnnotations-only and is deliberately **not** registered — it would add a filter to every endpoint, streaming routes included, with no attributes left to act on. `[AsParameters]` records are checked only where `ValidationEndpointFilter.Require<T>()` is attached.
+- Known limits: the A2A task store is in-memory (one instance or sticky sessions); forwarded headers trust any peer that reaches the container; `/health/ready` is anonymous and unmetered.
 
-- **Secrets.** The C# standard prefers `DefaultAzureCredential` + Key Vault over secrets. An OpenAI API key has no managed-identity equivalent, so samples read it from `dotnet user-secrets` (which stores outside the repo tree) or the `OPENAI_API_KEY` environment variable. The rule's intent — no secret is ever committed — still holds absolutely.
-- **Tests.** The `[ProjectName].Tests` xUnit convention applies to shared library code. Samples call a live model and are not unit-tested.
+### How this solution instantiates the architecture rule
+
+`.claude/rules/api-architecture.md` is written in placeholders and names no repository, so it can be copied into any solution unchanged. This section is its instance here.
+
+`<Root>` = `Andes.Agents`; `<Prefix>` = `Andes` (`AddAndesKeyVault`, `AddAndesTelemetry`, `AddAndesAuthentication`, `AddAndesCors`, `AddAndesRateLimiting`, `AddAndesProblemDetails`, `AddAndesExceptionHandling`, `AddAndesHealthChecks`, `AddAndesOpenApi`, `AddAndesAzureCredential`, `AddAndesCosmosPersistence`, `AddAndesCosmosHealthCheck`); `AddCoreServices` registers the clock, the caller context and the prompt loader. `<Provider>` = `Cosmos`, the only store. The folder-by-folder map is `docs/architecture/overview.md`.
+
+**Sanctioned deviations** — where this solution departs from the rule.
+
+- **The prompt is an embedded resource**, not a shipped `<None>` asset: `Service/Prompts/weather-agent-instructions.md` is read by `PromptTemplateLoader` through its logical name in `Common/Constants/PromptNames.cs`.
+- **A route may not match its feature.** The `Sessions` feature is served at `api/conversations` by `SessionEndpoints`; the A2A and AG-UI hosts live in `AgentEndpoints` at `weather/a2a` and `weather/ui`, and the card at `/.well-known/agent-card.json`. The wire contract wins over the naming rule.
+- **`Api/Options/OpenAIEndpointOptions.cs` carries no `SectionName`.** It is an abstract base, not a section: `AzureOpenAIOptions` and `MicrosoftFoundryOptions` derive from it and carry the section names, and `OpenAIEndpointOptionsValidator<T>` is the shared rule set each subclasses so failures name their own section.
+- **`Problems/ProblemTypes.cs` is a constant catalog outside `Common/Constants/`.** It stays in Api because it is the wire contract of the problem responses; every other catalog obeys the rule.
+- **One exception handler, not one per condition.** `GlobalExceptionHandler.cs` maps every exception in a single switch expression, so a new domain exception means an arm there and a type in `ProblemTypes.cs`.
+
+**Design notes** — these follow the rule; recorded because the reason is not obvious.
+
+- **No EF Core.** The only store is Cosmos DB through the raw SDK, so `Repository/Cosmos/` has no `DbContexts/`, `Configurations/` or `Migrations/`.
+- **`Api/Startup/CosmosBootstrapper.cs` is in Api, not the provider folder.** `Program.cs` runs `IStartupValidator.Validate()` before provisioning, so nothing external is touched by a process about to fail on its own configuration; a hosted service in Repository would run after that guard.
+- **`CosmosContainerNames` is interface segregation**, not leftover indirection: `CosmosContainers` and `CosmosResourceProvisioner` need three container ids, not the endpoint, key and connection mode.
+- **`SessionsOptionsValidator` is public** while every other options validator is internal, because the composition root in Api registers it across the project boundary.
+- **`Repository` reaches `Common` through the chain** (`Repository → Entity → Common`) rather than declaring it. The composition-root clause applies to Api, where transitive reliance would hide a layering error; below it the declared chain is the contract, and `Service` uses `Common.Constants` the same way.
+
+## Build and tooling reality
+
+- **`Directory.Build.props` and `Directory.Packages.props` sit beside the `.slnx`.** Central package management is on — a `PackageReference` never carries a `Version`; add new versions to the props file. `TreatWarningsAsErrors`, `EnforceCodeStyleInBuild`, `AnalysisLevel latest-recommended` and `GenerateDocumentationFile` are all on, so `.editorconfig` (file-scoped namespaces, `_camelCase` fields, IDE0005 unused usings, formatting) **and** CS1591 missing-XML-doc are build errors. Every public type and member needs a `<summary>`; positional records need either no `<param>` tags or all of them.
+- Evaluation-only APIs (`OPENAI001` for the Responses client, `MAAI001` for the stored-output-disabled adapter) are suppressed with a call-site `#pragma`, never project-wide.
+- No `global.json`; SDK 10.0.401 builds it. `.gitattributes` forces `* text=auto eol=lf`.
+- **No CI, no tests.** `dotnet build` and `dotnet format --verify-no-changes` are the local gates; the smoke procedure in the runbook is manual.
+- On Windows a test server started from Git Bash is stopped by port (`netstat -ano | grep ":<port> "` then `taskkill //F //PID <pid>`); `pkill` and `taskkill //IM` leave it running and lock the DLL for the next build.
+
+## Secrets
+
+Nothing sensitive is committed. `appsettings.json` ships every key with secrets blank; local values go into `dotnet user-secrets` (the Api project has a `UserSecretsId`) or environment variables (`Foundry__ApiKey`, `CosmosDb__Key`, …). With `KeyVault:Enabled`, secrets named with `--` (`Foundry--ApiKey`) layer on top through `DefaultAzureCredential`. The Foundry API key has no managed-identity equivalent, which is the one accepted carve-out from the prefer-`DefaultAzureCredential` standard; Cosmos uses the shared credential whenever `CosmosDb:Key` is blank.
 
 ## Communication & comments (always)
 
@@ -35,69 +76,97 @@ Two deliberate carve-outs from the standards below — deviations by decision, n
 
 **Code comments**
 
-- Comment only what code cannot say: why a decision was made, constraints, non-obvious invariants, workarounds with links.
-- Never narrate what code does. No per-function comment quota. No change-narration comments ("added X", "now uses Y").
-- XML doc comments on public APIs are API documentation, not comments — that standard stands.
+Write for a senior engineer who knows the language and can read the code. A comment supplies what the code cannot — nothing else.
+
+- **Default to no comment.** Add one only where a competent reader would still ask _why_. No per-type or per-member quota.
+- **One or two lines.** Three needs a reason; past six the content belongs in `docs/` with a one-line pointer from the code.
+- **Never reference PRD story ids, epics, or design frames.** Traceability belongs in the PR description and `docs/`; in source it goes stale and says nothing about the code in front of the reader. Test names describe behaviour, not story ids.
+- **Never explain the language, framework, or API** — not what a primary constructor is, not how `IAsyncEnumerable` works, not what `nameof` returns.
+- **Never narrate.** No "added X", "now uses Y". No restating the statement below it.
+- **Do write**: why the non-obvious choice beat the obvious one, an invariant a caller must hold, a workaround with its link or issue, a spec or vendor constraint. State the cause once — not the argument, the alternatives weighed, or the history.
+- **Compress rather than delete.** A real _why_ buried in a paragraph becomes one sentence; it does not disappear.
+
+```csharp
+// Bad — narrates, teaches the platform, cites a story
+/// <summary>
+/// US-118 asks the tool to check the image before the call. A primary constructor captures
+/// the client, and IAsyncEnumerable lets the caller stream results as they arrive. Added
+/// local validation here so we fail fast instead of round-tripping to the service.
+/// </summary>
+
+// Good — the one thing the code cannot say
+/// <remarks>Checked locally: the service rejects masks over 4 MB with an opaque 400.</remarks>
+```
 
 ## C# coding standards (always)
 
-Full standards live in `.claude/rules/csharp.md` (auto-applies to `*.cs`). The always-on core:
+Full standards live in `.claude/rules/csharp.md` (auto-applies to `**/*.cs`), and `.editorconfig` encodes them for `dotnet format` and, through `EnforceCodeStyleInBuild`, for the build. The always-on core:
 
-- Target the latest C# version (currently **C# 14**); honor `.editorconfig`; prefer pattern matching, switch expressions, and `nameof(...)`.
+- Target the latest C# version (currently **C# 14**); prefer pattern matching, switch expressions, and `nameof(...)`.
+- **File-scoped namespaces** everywhere — `.editorconfig` sets this at `error` severity and every file already complies.
 - Prefer **primary constructors**; capture each injected dependency into a `private readonly` `_camelCase` field and use the field in method bodies.
 - Prefer **collection expressions** (`[]`, `[1, 2, 3]`, `[.. items]`) over `new List<T>()`, `new T[] { }`, or `Array.Empty<T>()`.
-- PascalCase for types, methods, and public members; `_camelCase` private fields; camelCase locals and parameters; `I`-prefixed interfaces.
+- PascalCase for types, methods, and public members; `_camelCase` private fields (constants included); camelCase locals and parameters; `I`-prefixed interfaces.
 - Declare variables non-nullable; validate `null` at entry points only; use `is null` / `is not null` — **never** `== null` / `!= null`.
-- Suffix async methods with `Async`; **never** block with `.Result`, `.Wait()`, or `.GetAwaiter().GetResult()`; no `async void` outside event handlers; flow a `CancellationToken` through long-running operations (see the `csharp-async` skill).
-- Centralize error handling; return errors as Problem Details (RFC 9457). **Never log PII or secrets.**
-- XML doc comments on all public APIs (see the `csharp-docs` skill).
-- xUnit tests in a `[ProjectName].Tests` project, named `MethodName_Scenario_ExpectedBehavior`; Arrange-Act-Assert structure but **no** `// Arrange` / `// Act` / `// Assert` comments (see the `csharp-xunit` skill).
+- Suffix async methods with `Async`; **never** block with `.Result`, `.Wait()`, or `.GetAwaiter().GetResult()`; no `async void` outside event handlers; flow a `CancellationToken` through long-running operations (see the `csharp-async` skill). `ConfigureAwait(false)` is used in `Service` and `Repository` and omitted in `Api` — follow the surrounding project.
+- **Never log PII or secrets.** The `oid` is a personal identifier: it goes into partition keys, never into log messages or problem bodies.
+- **XML docs** — a one-sentence `<summary>` on public API surface; interfaces carry the docs and implementations use `/// <inheritdoc />`. `<param>`/`<returns>` only where they add what the signature does not. `<remarks>` is for a caveat a caller must know, two sentences at most — not rationale, not history. `<example>`/`<code>` only where correct usage is genuinely non-obvious. `internal` and test types are not API surface: comment them only where a _why_ exists. **This overrides the `csharp-docs` skill wherever the two disagree** — that skill describes .NET's framework-reference house style, which is not this repository's.
 - When reviewing, make only **high-confidence** suggestions; comment on _why_ a non-obvious design decision was made.
+
+**Tests.** None exist yet. When they do: xUnit **v3** under `weather-agent/Andes.Agents/tests/`, named `MethodName_Scenario_ExpectedBehavior`, Arrange-Act-Assert structure but **no** `// Arrange` / `// Act` / `// Assert` comments, plain xUnit `Assert` (no FluentAssertions — v8+ is commercially licensed), isolation with **NSubstitute** and **never Moq**, and integration tests against **Testcontainers** (a local test instance only where no image exists). Agent code that calls a live model is not unit-tested. The `csharp-xunit` skill suggests Moq and a fluent assertion library; `csharp.md` overrides it.
+
+**Validation.** FluentValidation only — no `System.ComponentModel.DataAnnotations` anywhere. Each validated type declares its `AbstractValidator<T>` in the same file, which is the one sanctioned exception to file-name-equals-type-name.
 
 ## Skills
 
-The skill roster (names + descriptions) is always in context; routing notes the roster lacks:
+The roster (names + descriptions) is always in context; these are the routing notes it lacks.
 
-- `microsoft-agent-framework` is the source of truth for agent and workflow work here — read `references/dotnet.md` for the .NET surface. The framework moves fast, so ground specifics in live docs rather than memory.
-- `microsoft-docs` is the research lane for learn.microsoft.com and beyond; it wraps the `microsoft-learn` and `context7` MCP servers.
+- **`microsoft-agent-framework`** is the primary skill for this repository. The framework is in public preview and the Learn API reference lags the packages (it still shows `AgentThread`, `MapAGUI`, `UseClaimsBasedSessionIsolation`); ground advice in the `main` source and conceptual docs through `microsoft-docs`, and trust the compiler over both.
+- `csharp-async`, `csharp-docs`, `csharp-xunit` and `ef-core` are preloaded by the `csharp-code-reviewer` subagent; each is invokable on its own. `ef-core` has nothing to act on — persistence is the raw Cosmos SDK.
 - `prd` is preloaded by `prd-generator`; `technical-writing` (document-type templates) by `se-technical-writer`.
+- The three `github-actions-*` skills are the lanes preloaded by `github-actions-reviewer`. **There is no `.github/` directory in this repository**, so all four are idle until someone adds workflows.
 
-## Detailed standards — `.claude/rules/`
+## Rules — `.claude/rules/`
 
-`csharp.md` auto-loads whenever you edit a `*.cs` file. When reviewing or planning without editing, `Read` it directly.
+Five files, auto-loaded when you edit a matching path; the globs live in each rule's frontmatter under a `paths:` list, and none carry a `description:`.
+
+| Rule | `paths:` glob | Applies here? |
+| --- | --- | --- |
+| `csharp.md` | `**/*.cs` | **Yes** — the standards above. |
+| `api-architecture.md` | `**/*.cs`, `**/*.csproj` | **Yes** — where every file goes and what it is called. Portable and repo-agnostic; this solution's instance of it is in §"How this solution instantiates the architecture rule". |
+| `aspnet-rest-apis.md` | `**/*.cs` | Loads on every C# edit; relevant to `Andes.Agents.Api`. |
+| `azure-functions-csharp.md` | `**/*.cs` | Loads on every C# edit, but there are no Azure Functions here. Ignore it. |
+| `terraform.md` | `**/*.tf` | No `.tf` files exist; never matches. |
+
+When reviewing or planning without editing, `Read` the matching rule directly.
 
 ## MCP servers — see `@.mcp.json`
 
-`.claude/settings.json` sets `enableAllProjectMcpServers: true`, so the servers configured in `@.mcp.json` are available:
+`.claude/settings.json` sets `enableAllProjectMcpServers: true`, so the servers in `@.mcp.json` are available. Two are defined:
 
-- **`microsoft-learn`** — ground version-specific Agent Framework / .NET answers in official docs (`microsoft_docs_search` → `microsoft_code_sample_search` → `microsoft_docs_fetch`) instead of memory.
-- **`context7`** — docs outside learn.microsoft.com; resolve the library ID first, then query.
+- **`microsoft-learn`** (http) — ground version-specific .NET, Azure and Agent Framework answers in official docs (`microsoft_docs_search` → `microsoft_code_sample_search` → `microsoft_docs_fetch`) instead of memory.
+- **`context7`** (npx) — docs outside learn.microsoft.com; resolve the library id first, then query.
 
-> **Trust gate:** since Claude Code v2.1.196, a checked-in `.claude/settings.json` cannot approve its own repo's MCP servers while the folder is **untrusted** — the key is ignored and servers sit at "Pending approval" until the workspace trust dialog is accepted. To have these servers auto-approve even before trusting, add a name-based list to your **user-level** `~/.claude/settings.json`: `"enabledMcpjsonServers": ["microsoft-learn", "context7"]`. If a server shows **Rejected**, a stale per-project choice is cached — run `claude mcp reset-project-choices` in that repo.
+`settings.json` also lists `terraform` under `enabledMcpjsonServers`, but `.mcp.json` does not define it, so that entry does nothing.
 
-## Delegation rules
+> **Trust gate:** a checked-in `.claude/settings.json` cannot approve its own repo's MCP servers while the folder is **untrusted** — the key is ignored and servers sit at "Pending approval" until the workspace trust dialog is accepted. To auto-approve regardless, add a name-based list to your **user-level** `~/.claude/settings.json`: `"enabledMcpjsonServers": ["microsoft-learn", "context7"]`. If a server shows **Rejected**, a stale per-project choice is cached — run `claude mcp reset-project-choices` in this repo.
 
-Every subagent is pinned to extra-high reasoning effort; model, tools, and preloaded skills live in each agent's frontmatter. Reviewer loops are capped: apply Critical/High findings, re-review only the changed files, at most two rounds, then surface anything still open to the user.
+## Delegation
 
-- **When the user asks to write a PRD, spec a feature, define requirements, or break a feature into epics/user stories**, delegate to `prd-generator` — do not write PRDs inline. Its report always starts with a `PRD-STATUS:` line. If it starts `PRD-STATUS: NEEDS-INPUT`, show its questions to the user verbatim (do not answer them yourself) and re-invoke the agent with the answers. It only creates GitHub issues when re-invoked with a statement that the user explicitly approved issue creation for the PRD path. `docs/prd/` is owned by `prd-generator`; a PRD is a pre-implementation artifact — writing one gets no `se-technical-writer` delegation and no changelog entry. Implementation plans for a feature that has a PRD should reference its story IDs (`US-xxx`).
+Four subagents, all pinned to extra-high reasoning effort; `csharp-code-reviewer` and `github-actions-reviewer` run on `opus`, the other two on `sonnet`. Tools and preloaded skills live in each agent's frontmatter. Reviewer loops are capped: apply Critical/High findings, re-review only the changed files, at most two rounds, then surface anything still open to the user.
+
 - **After implementing or modifying C# code**, delegate a quality review to `csharp-code-reviewer`. It reports findings; it does not edit files.
-- **After a sample or feature is implemented and the reviewer verdict passes**, ALWAYS delegate to `se-technical-writer` to author or update Markdown docs under `docs/` (create the folder if it does not exist) **and** add the entry to the root `CHANGELOG.md` under `[Unreleased]`. Also delegate to it whenever implementation details need documenting on their own.
-
-## Changelog & feature tracking
-
-Root `CHANGELOG.md`, [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format:
-
-- One entry per PR under `## [Unreleased]`, in the matching subsection (`### Added`, `### Changed`, `### Fixed`, `### Removed`, `### Deprecated`, `### Security`) — concise, reader-facing phrasing, not a commit list.
-- `se-technical-writer` owns it; routine cleanups with no behavior change still get a one-line entry, even when they need no docs.
-- On release, `[Unreleased]` is renamed to the version and date, and a fresh `[Unreleased]` section is started.
+- **After a feature is implemented and the reviewer verdict passes**, delegate to `se-technical-writer` to update the Markdown under `docs/` and add the entry to the root `CHANGELOG.md` — [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format, one `## [Unreleased]` section, one reader-facing entry per PR in the matching subsection. `docs/` follows `docs/README.md`'s index: `architecture/`, `conversations/`, `agent/`, `operations/`, `adr/`.
+- **`github-actions-reviewer`** has nothing to review until a `.github/workflows/` tree exists. If workflows are added, route to it.
+- **PRDs are not checked in.** `prd-generator` and the `prd` skill remain installed for a user who explicitly asks; nothing routes to them by default, and a PRD written that way is a scratch artifact.
 
 ## Common commands
 
 ```bash
-dotnet build                                          # compile the solution
-dotnet format                                         # apply .editorconfig formatting
-dotnet run --project samples/01-get-started/HelloAgent
-
-# supply the OpenAI key without committing it
-dotnet user-secrets set "OpenAI:ApiKey" "sk-..." --project samples/01-get-started/HelloAgent
+# from the repo root
+dotnet build weather-agent/Andes.Agents/Andes.Agents.slnx
+dotnet format weather-agent/Andes.Agents/Andes.Agents.slnx --verify-no-changes   # read-only check
+dotnet run --project weather-agent/Andes.Agents/Andes.Agents.Api                 # needs Foundry, Cosmos and AzureAd configured — see docs/operations/runbook.md
 ```
+
+Both the build and the format check pass on the current tree. There is no `dotnet test` — no test project exists. There is no root solution, so every command names its path explicitly.

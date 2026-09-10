@@ -1,57 +1,83 @@
 # maf-agents
 
 [![.NET](https://img.shields.io/badge/.NET-10-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com)
-[![Agent Framework](https://img.shields.io/badge/Microsoft_Agent_Framework-1.17.0-0078D4?logo=microsoft&logoColor=white)](https://learn.microsoft.com/agent-framework/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Runnable **[Microsoft Agent Framework](https://learn.microsoft.com/agent-framework/)** examples in **C#**.
+Agents built with the [Microsoft Agent Framework](https://learn.microsoft.com/agent-framework/) in C#.
 
-Each sample is a self-contained console app that demonstrates one concept — create an agent, give it tools, keep conversation state, compose a workflow — small enough to read in a sitting and copy into your own project.
+## Status
+
+Early, and worth stating plainly: this branch holds one solution — [weather-agent/Andes.Agents/](weather-agent/Andes.Agents/) — scaffolded from `dotnet new webapi` and not yet implemented.
+
+- **No Agent Framework package is referenced anywhere yet.** There is no agent, model client, or tool.
+- Four of the five projects (`Common`, `Entity`, `Repository`, `Service`) are empty class libraries — a `.csproj` each and no source.
+- `Andes.Agents.Api` has no `Controllers/` directory, so it starts and maps no routes.
+
+An earlier version of this repository held runnable console samples (`HelloAgent`, `ImageAgent`), two architecture decision records, and central package management. That content lives on the `main` branch and is not present here; `git show main:<path>` reads any of it.
 
 ## Prerequisites
 
-- [.NET 10 SDK](https://dotnet.microsoft.com/download) or later
-- An [OpenAI API key](https://platform.openai.com/api-keys)
+- [.NET 10 SDK](https://dotnet.microsoft.com/download)
 
-## Run a sample
+There is no `global.json`, so the SDK version is not pinned.
+
+## Layout
+
+```
+maf-agents/
+├── .claude/                        Claude Code project memory, rules, skills, subagents
+├── weather-agent/Andes.Agents/
+│   ├── Andes.Agents.slnx           the only solution file
+│   ├── Andes.Agents.Api/           ASP.NET Core web API (scaffold)
+│   ├── Andes.Agents.Common/        empty
+│   ├── Andes.Agents.Entity/        empty
+│   ├── Andes.Agents.Repository/    empty
+│   └── Andes.Agents.Service/       empty
+├── .editorconfig                   C# style, enforced by dotnet format
+├── .gitattributes                  LF line endings
+├── CHANGELOG.md                    empty
+└── LICENSE
+```
+
+The project names imply the layering `Api → Service → Repository → Entity`, plus `Common`. No project references are wired between them yet.
+
+## Build and run
 
 ```bash
 git clone https://github.com/RorroRojas3/maf-agents.git
 cd maf-agents
-dotnet build
 
-# store the key outside the repo — never commit it
-dotnet user-secrets set "OpenAI:ApiKey" "sk-..." --project samples/01-get-started/HelloAgent
-
-dotnet run --project samples/01-get-started/HelloAgent
+dotnet build weather-agent/Andes.Agents/Andes.Agents.slnx
+dotnet run --project weather-agent/Andes.Agents/Andes.Agents.Api
 ```
 
-`OPENAI_API_KEY` in your environment works as an alternative to user-secrets. Override the model per sample with `OpenAI:Model` (default `gpt-4o-mini`).
+There is no solution file at the repository root, so every command names its path.
 
-## Samples
+Under the Development environment the API serves its OpenAPI document at `/openapi/v1.json`. Nothing else is mapped.
 
-Categories mirror the [official Agent Framework sample taxonomy](https://github.com/microsoft/agent-framework/tree/main/dotnet/samples).
+## Conventions
 
-| Sample | Shows |
-| --- | --- |
-| [01-get-started/HelloAgent](samples/01-get-started/HelloAgent/) | Creating an agent and getting both a complete and a streamed response |
+**Style** lives in [.editorconfig](.editorconfig), which encodes the C# standards in [.claude/rules/csharp.md](.claude/rules/csharp.md) — file-scoped namespaces, `_camelCase` private fields, `I`-prefixed interfaces, PascalCase members, LF endings, 4-space C# indentation. Because this branch has no `Directory.Build.props`, the **build does not enforce any of it**; `dotnet format` is the check:
 
-More are on the way across `02-agents` (tools, middleware, providers), `03-workflows` (sequential, concurrent, handoff, group chat, magentic), `04-hosting`, and `05-end-to-end`.
+```bash
+dotnet format weather-agent/Andes.Agents/Andes.Agents.slnx --verify-no-changes
+```
 
-## How this repo is built
+Both `dotnet build` and that check pass on the current tree.
 
-**Stable packages only.** No `--prerelease` anywhere. The Agent Framework core (`Microsoft.Agents.AI`, `.Abstractions`, `.OpenAI`, `.Workflows`) is GA at 1.17.0, so the samples build on that. This is also why they use OpenAI directly rather than Microsoft Foundry or Azure OpenAI: `Microsoft.Agents.AI.Foundry`, `Azure.AI.Projects`, and every `Azure.AI.OpenAI` release after 2.1.0 ship prerelease only. The full reasoning, and what would justify changing it, is in [ADR-0001](docs/adr/0001-openai-as-model-provider.md).
+**Package versions** are declared inline in each `.csproj`. Central package management is used on `main`, but no `Directory.Packages.props` exists here.
 
-**Central package management.** Every version lives in [Directory.Packages.props](Directory.Packages.props); no `.csproj` carries a `Version` attribute. Shared compiler settings — `net10.0`, latest C#, nullable, warnings-as-errors — live in [Directory.Build.props](Directory.Build.props).
+**Line endings** are normalised to LF by [.gitattributes](.gitattributes). Without it, a Windows clone with `core.autocrlf=true` fails the format check on every file.
 
-**No secrets, ever.** Samples read the API key from `dotnet user-secrets` (stored outside the repo tree) or the environment. Nothing sensitive is committed.
+**No secrets are committed.** When a model provider is wired up, supply credentials through `dotnet user-secrets` or environment variables — never a tracked file.
 
-## Contributing a sample
+**No CI.** There are no GitHub Actions workflows; the build and format checks run locally only.
 
-1. Create the project under `samples/<NN-category>/<SampleName>/` and add it to `maf-agents.slnx`.
-2. Reference packages without versions; add any new version to `Directory.Packages.props`.
-3. Include a `README.md` in the sample folder covering what it demonstrates, prerequisites, and how to run it.
-4. Confirm `dotnet build` and `dotnet format --verify-no-changes` both pass, then add a row to the table above.
+## Adding a project
+
+1. Create it under `weather-agent/Andes.Agents/` and add it to `Andes.Agents.slnx`.
+2. Declare `net10.0`, `Nullable` and `ImplicitUsings` in the `.csproj` to match the existing projects, and give every `PackageReference` an explicit `Version`.
+3. Confirm `dotnet build` and `dotnet format --verify-no-changes` both pass.
 
 ## License
 
