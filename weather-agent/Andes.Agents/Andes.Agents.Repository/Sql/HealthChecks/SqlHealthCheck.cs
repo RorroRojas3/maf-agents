@@ -7,15 +7,15 @@ namespace Andes.Agents.Repository.Sql.HealthChecks;
 
 // Not Database.CanConnectAsync: that runs inside the retrying execution strategy and its own one-minute login-retry loop.
 // An unpooled connection answers for the server as it is now, not for a session the pool kept alive.
-internal sealed class SqlHealthCheck(PolicyDbContext dbContext) : IHealthCheck
+internal sealed class SqlHealthCheck(PolicyDbContext ctx) : IHealthCheck
 {
     private const int _commandTimeoutSeconds = 5;
 
-    private readonly PolicyDbContext _dbContext = dbContext;
+    private readonly PolicyDbContext _ctx = ctx;
 
     public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
     {
-        SqlConnectionStringBuilder probe = new(_dbContext.Database.GetConnectionString())
+        SqlConnectionStringBuilder probe = new(_ctx.Database.GetConnectionString())
         {
             Pooling = false,
         };

@@ -235,6 +235,7 @@ tests/<Root>.Integration.Test/
 | Exception handlers | `<Name>ExceptionHandler` | `ValidationExceptionHandler` |
 | Health checks | `<Name>HealthCheck` | `DatabaseHealthCheck` |
 | EF interceptors | `<Name>Interceptor`, named for what it does | `AuditTimestampInterceptor`, `SoftDeleteInterceptor` |
+| An injected `DbContext` | field `_ctx` from primary-constructor parameter `ctx`, whatever the context type — never `_dbContext` or `_context` | `private readonly OrdersDbContext _ctx = ctx;` |
 | Store provisioning | `<Provider>ResourceProvisioner` creates resources; `<Provider>SchemaMigrator` applies migrations | `MongoResourceProvisioner`, `SqlSchemaMigrator` |
 | Startup | `<Name>Bootstrapper` | `SchemaBootstrapper` |
 | Enums | plural, one per file | `JobStatuses`, `SortDirections` |

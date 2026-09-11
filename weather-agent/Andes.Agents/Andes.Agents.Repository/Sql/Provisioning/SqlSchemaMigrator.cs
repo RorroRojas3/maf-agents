@@ -8,10 +8,10 @@ namespace Andes.Agents.Repository.Sql.Provisioning;
 /// Development only: the production login holds no DDL rights, so production applies
 /// <c>dotnet ef migrations script --idempotent</c> or a migrations bundle from its pipeline.
 /// </remarks>
-public sealed class SqlSchemaMigrator(PolicyDbContext dbContext)
+public sealed class SqlSchemaMigrator(PolicyDbContext ctx)
 {
-    private readonly PolicyDbContext _dbContext = dbContext;
+    private readonly PolicyDbContext _ctx = ctx;
 
     /// <summary>Creates the database when it is missing and applies every pending migration.</summary>
-    public Task MigrateAsync(CancellationToken cancellationToken) => _dbContext.Database.MigrateAsync(cancellationToken);
+    public Task MigrateAsync(CancellationToken cancellationToken) => _ctx.Database.MigrateAsync(cancellationToken);
 }
