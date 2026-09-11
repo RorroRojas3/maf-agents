@@ -104,13 +104,30 @@ Bound by `Repository/Sql/Options/SqlDbOptions.cs` — the store's own project, n
 
 | Key | Meaning | Default | Required |
 |---|---|---|---|
-| `SqlDb:ConnectionString` | SQL Server connection string; its `Authentication` keyword chooses SQL login or Microsoft Entra ID sign-in. Must parse and name a database. | _(blank)_ | Yes |
 | `SqlDb:CommandTimeoutSeconds` | Seconds a command may run before it's abandoned. | `30` | No, range 1–600 |
 | `SqlDb:MaxRetryCount` | Times a transient failure is retried (`EnableRetryOnFailure`). | `6` | No, range 0–10 |
 | `SqlDb:MaxRetryDelaySeconds` | Longest delay between two retries, in seconds. | `30` | No, range 1–300 |
 | `SqlDb:ApplyMigrationsOnStartup` | Run `Database.MigrateAsync` on startup. **Development only** — production has no DDL rights and applies an idempotent script or a migrations bundle from its own pipeline instead (see the [runbook](runbook.md#provisioning-the-policy-database)). | `false` | No |
 
-The validator never echoes `ConnectionString` in a failure message, since it can carry a password — a startup failure names the key, not the value. Key Vault secret name: `SqlDb--ConnectionString`. See [Architecture overview](../architecture/overview.md#the-corepolicy-table) for the schema this produces and [ADR-0002](../adr/0002-sql-server-policy-store.md) for why SQL Server sits alongside Cosmos DB.
+### `ConnectionStrings:DefaultConnection`
+
+The connection string itself lives outside the `SqlDb` section, at the ASP.NET Core standard `ConnectionStrings:DefaultConnection` key, so it lines up with the platform's own connection-string conventions rather than `SqlDb`'s.
+
+| Key | Meaning | Default | Required |
+|---|---|---|---|
+| `ConnectionStrings:DefaultConnection` | SQL Server connection string for `PolicyDbContext`; its `Authentication` keyword chooses SQL login or Microsoft Entra ID sign-in. Must parse and name a database. | LocalDB `(localdb)\MSSQLLocalDB`, database `andes-agents`, Windows authentication | Yes |
+
+Environment variable: `ConnectionStrings__DefaultConnection`. Key Vault secret name: `ConnectionStrings--DefaultConnection`. An Azure App Service connection string named `DefaultConnection` (type **SQL Azure**) also lands on this key — App Service injects it as the environment variable `SQLAZURECONNSTR_DefaultConnection`, and the ASP.NET Core environment-variable configuration provider strips that prefix and folds the value under `ConnectionStrings:DefaultConnection` automatically (see [Connection string prefixes](https://learn.microsoft.com/aspnet/core/fundamentals/configuration/#connection-string-prefixes)).
+
+Because the checked-in default is a valid, non-blank connection string, a deployment that never overrides `ConnectionStrings:DefaultConnection` passes startup validation and fails only at `/health/ready`, when it can't reach LocalDB.
+
+The old `SqlDb:ConnectionString` key — and its environment-variable (`SqlDb__ConnectionString`) and Key Vault (`SqlDb--ConnectionString`) forms — is no longer read at all; the switch is deliberate and carries no compatibility shim, since the SQL store isn't released yet.
+
+The validator never echoes the value in a failure message, since a connection string can carry a password — a startup failure names the key, not the value:
+
+> `SqlDbOptions.ConnectionString: 'ConnectionStrings:DefaultConnection' must be a valid SQL Server connection string that names a database.`
+
+See [Architecture overview](../architecture/overview.md#the-corepolicy-table) for the schema this produces and [ADR-0002](../adr/0002-sql-server-policy-store.md) for why SQL Server sits alongside Cosmos DB.
 
 `Logging:LogLevel:Microsoft.EntityFrameworkCore.Database.Command` is set to `Warning` in `appsettings.json`, so EF's per-command SQL logging (Information by default) doesn't dominate the log at normal levels; command text carries no caller-supplied values worth exposing at Warning either way, since parameters are logged separately and sensitive-data logging is never turned on.
 

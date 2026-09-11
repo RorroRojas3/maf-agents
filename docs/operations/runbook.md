@@ -73,9 +73,11 @@ dotnet user-secrets set "CosmosDb:Key" "C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5
 `MicrosoftFoundry:Endpoint`/`MicrosoftFoundry:ApiKey`/`MicrosoftFoundry:Model` are optional — set them the same way if you need the Chat Completions client; leaving `MicrosoftFoundry:Endpoint` unset skips that registration entirely.
 
 ```bash
-dotnet user-secrets set "SqlDb:ConnectionString" "Server=localhost,1433;Database=AndesAgents;User Id=sa;Password=<password>;TrustServerCertificate=true"
+dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Server=localhost,1433;Database=AndesAgents;User Id=sa;Password=<password>;TrustServerCertificate=true"
 dotnet user-secrets set "SqlDb:ApplyMigrationsOnStartup" "true"
 ```
+
+The checked-in `appsettings.json` default for `ConnectionStrings:DefaultConnection` points at SQL Server LocalDB, not the container above — skip this override and the app talks to LocalDB's `andes-agents` database instead of the one you just started in Docker.
 
 `appsettings.Development.json` no longer exists, so `ApplyMigrationsOnStartup` — normally a Development-only default — is set as a user-secret like everything else here; without it, the database is never created or migrated on `dotnet run`, and every request against it fails.
 
@@ -107,7 +109,7 @@ The API must also expose the scope `ApiDocs:Scopes` names, in its fully qualifie
 dotnet run --project weather-agent/Andes.Agents/Andes.Agents.Api
 ```
 
-`CosmosDb:CreateResourcesOnStartup: true` (the Development default) creates the `andes-agents` database and both containers on this run if they don't already exist; `SqlDb:ApplyMigrationsOnStartup: true` (set above) creates the `AndesAgents` database and applies `CreatePolicyTable` the same way. `/scalar` opens automatically (`launchSettings.json`'s `launchUrl`).
+`CosmosDb:CreateResourcesOnStartup: true` (the Development default) creates the `andes-agents` database and both containers on this run if they don't already exist; `SqlDb:ApplyMigrationsOnStartup: true` (set above) creates the `AndesAgents` database named by your `ConnectionStrings:DefaultConnection` override and applies `CreatePolicyTable` the same way. Skip that override and `ApplyMigrationsOnStartup` instead creates and migrates the checked-in default's LocalDB database, `andes-agents` — a working but separate local database from the Docker container this section set up. `/scalar` opens automatically (`launchSettings.json`'s `launchUrl`).
 
 ## Smoke test
 
@@ -256,10 +258,10 @@ dotnet tool run dotnet-ef migrations add <VerbSubject> \
   --context PolicyDbContext --output-dir Sql/Migrations
 ```
 
-`migrations add` never opens a connection, so the design-time factory falls back to a localhost placeholder connection string unless one is supplied. Commands that do connect — `database update`, a bundle run — take it either as `--connection` or as the `SqlDb__ConnectionString` environment variable, which the factory reads first:
+`migrations add` never opens a connection, so the design-time factory falls back to a localhost placeholder connection string unless one is supplied. Commands that do connect — `database update`, a bundle run — take it either as `--connection` or as the `ConnectionStrings__DefaultConnection` environment variable, which the factory reads first; it reads neither `appsettings.json` nor user-secrets:
 
 ```bash
-SqlDb__ConnectionString="Server=localhost,1433;Database=AndesAgents;User Id=sa;Password=<password>;TrustServerCertificate=true" \
+ConnectionStrings__DefaultConnection="Server=localhost,1433;Database=AndesAgents;User Id=sa;Password=<password>;TrustServerCertificate=true" \
   dotnet tool run dotnet-ef database update \
   --project weather-agent/Andes.Agents/Andes.Agents.Repository \
   --startup-project weather-agent/Andes.Agents/Andes.Agents.Repository \
@@ -371,7 +373,7 @@ CREATE USER [andes-agents-app] FOR LOGIN [andes-agents-app]; -- or FROM EXTERNAL
 GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::Core TO [andes-agents-app];
 ```
 
-On Azure SQL, that principal is reached with Microsoft Entra ID rather than a SQL login: `Authentication=Active Directory Managed Identity;User Id=<client-id>` in `SqlDb:ConnectionString`. `Microsoft.Data.SqlClient` 6.1 — the version EF Core 10 resolves — still bundles the Entra ID authentication providers, so no extra package is needed for that connection-string keyword to work (see [ADR-0002](../adr/0002-sql-server-policy-store.md)); moving to SqlClient 7 would change that.
+On Azure SQL, that principal is reached with Microsoft Entra ID rather than a SQL login: `Authentication=Active Directory Managed Identity;User Id=<client-id>` in `ConnectionStrings:DefaultConnection`. `Microsoft.Data.SqlClient` 6.1 — the version EF Core 10 resolves — still bundles the Entra ID authentication providers, so no extra package is needed for that connection-string keyword to work (see [ADR-0002](../adr/0002-sql-server-policy-store.md)); moving to SqlClient 7 would change that.
 
 The target database's compatibility level must be **170** (SQL Server 2025 or Azure SQL only) — `SqlPersistenceConfiguration.ConfigureSqlServer` sets it explicitly on every connection, migrations included, because EF Core otherwise assumes 150 and avoids newer T-SQL. A database created by the idempotent script or a bundle already carries this, since both are generated from the same configuration the app runs with.
 
@@ -408,11 +410,11 @@ Register the exact `/scalar/` URI for the host and scheme you're using — trail
 **Signing in to Scalar fails with `AADSTS9002326` (redirect URI under the wrong platform).**
 The redirect URI is registered under **Web** instead of **Single-page application**. Scalar redeems the code from the browser, and Entra ID allows that cross-origin redemption only for Single-page application redirect URIs — move it there.
 
-**The application won't start, with a message naming `SqlDb:ConnectionString`.**
-`SqlDbOptionsValidator` rejected the value — either blank, or not something `SqlConnectionStringBuilder` can parse into a connection string that names a database. The message never echoes the value itself, since a connection string can carry a password; check what's actually in `SqlDb:ConnectionString` (or the `SqlDb__ConnectionString` environment variable) rather than trusting the error text to show it.
+**The application won't start, with a message naming `ConnectionStrings:DefaultConnection`.**
+`SqlDbOptionsValidator` rejected the value — either blank, or not something `SqlConnectionStringBuilder` can parse into a connection string that names a database. The message never echoes the value itself, since a connection string can carry a password; check what's actually in `ConnectionStrings:DefaultConnection` (or the `ConnectionStrings__DefaultConnection` environment variable) rather than trusting the error text to show it. A leftover `SqlDb:ConnectionString` from before this key moved is not read at all — it won't help here even if it's set correctly.
 
 **`/health/ready` reports `sql` Unhealthy with "SQL Server is unreachable or the database does not exist."**
-The check opened its own connection and ran `SELECT 1`; a stopped container, wrong credentials, or a database that hasn't been created yet all surface this way. Confirm the container is running (`docker ps`), the credentials in `SqlDb:ConnectionString` are right, and the database has been migrated (see [Migrations](#migrations)).
+The check opened its own connection and ran `SELECT 1`; a stopped container, wrong credentials, or a database that hasn't been created yet all surface this way. Confirm the container is running (`docker ps`), the credentials in `ConnectionStrings:DefaultConnection` are right, and the database has been migrated (see [Migrations](#migrations)) — and that you didn't skip the override, leaving the app pointed at the checked-in LocalDB default instead of the container.
 
 **`/health/ready` reports `sql` Unhealthy with "A timeout occurred while running check."**
 The probe didn't get an answer inside its 5-second budget (`HealthRegistration`'s `sql` timeout). A container still starting up, or a host that's unreachable rather than actively refusing the connection, both look like this instead of the message above — the distinction is whether SQL Server ever got a chance to answer.

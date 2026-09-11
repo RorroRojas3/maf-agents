@@ -8,7 +8,7 @@ namespace Andes.Agents.Repository.Sql.DbContexts;
 // `migrations add` and `script` never open the connection; `database update` and a bundle take `--connection`.
 internal sealed class PolicyDbContextDesignTimeFactory : IDesignTimeDbContextFactory<PolicyDbContext>
 {
-    private const string _connectionStringVariable = $"{SqlDbOptions.SectionName}__{nameof(SqlDbOptions.ConnectionString)}";
+    private const string _connectionStringVariable = $"ConnectionStrings__{SqlDbOptions.ConnectionStringName}";
     private const string _placeholderConnectionString = "Server=localhost,1433;Database=AndesAgents;Integrated Security=true;TrustServerCertificate=true";
 
     public PolicyDbContext CreateDbContext(string[] args)

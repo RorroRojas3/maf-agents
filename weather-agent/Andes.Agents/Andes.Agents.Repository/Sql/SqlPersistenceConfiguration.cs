@@ -25,7 +25,7 @@ public static class SqlPersistenceConfiguration
     // SQL Server 2025 and Azure SQL. Without it EF assumes 150 (SQL Server 2019) and avoids newer T-SQL.
     private const int _compatibilityLevel = 170;
 
-    /// <summary>Binds the SQL Server section and registers the pooled policy context and its schema migrator.</summary>
+    /// <summary>Binds the SQL Server section and default connection string, and registers the pooled policy context and its schema migrator.</summary>
     public static IServiceCollection AddAndesSqlPersistence(this IServiceCollection services, IConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(services);
@@ -35,6 +35,8 @@ public static class SqlPersistenceConfiguration
         services
             .AddOptions<SqlDbOptions>()
             .Bind(configuration.GetSection(SqlDbOptions.SectionName))
+            // App Service injects its connection strings (SQLAZURECONNSTR_<name>) under ConnectionStrings, never inside a section.
+            .Configure(options => options.ConnectionString = configuration.GetConnectionString(SqlDbOptions.ConnectionStringName) ?? string.Empty)
             .ValidateWithFluentValidation()
             .ValidateOnStart();
 
