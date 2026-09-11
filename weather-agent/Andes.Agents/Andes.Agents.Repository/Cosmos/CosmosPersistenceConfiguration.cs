@@ -1,5 +1,7 @@
 using Andes.Agents.Common.Validation;
+using Andes.Agents.Repository.Cosmos.HealthChecks;
 using Andes.Agents.Repository.Cosmos.Options;
+using Andes.Agents.Repository.Cosmos.Provisioning;
 using Andes.Agents.Repository.Cosmos.Serialization;
 using Andes.Agents.Repository.Cosmos.Sessions;
 using Andes.Agents.Repository.Sessions.Interfaces;

@@ -98,6 +98,22 @@ Bound by `Repository/Cosmos/Options/CosmosDbOptions.cs` — the store's own proj
 
 Key Vault secret name: `CosmosDb--Key`. See [Sessions and history](../conversations/sessions-and-history.md#data-model) for the container definitions this produces.
 
+## `SqlDb` — the policy database
+
+Bound by `Repository/Sql/Options/SqlDbOptions.cs` — the store's own project, not Api — and registered by `AddAndesSqlPersistence`, which `Program.cs` calls directly. Backs `PolicyDbContext`, the only consumer of `Microsoft.EntityFrameworkCore.*` in the solution (see [Architecture overview](../architecture/overview.md#where-things-live)).
+
+| Key | Meaning | Default | Required |
+|---|---|---|---|
+| `SqlDb:ConnectionString` | SQL Server connection string; its `Authentication` keyword chooses SQL login or Microsoft Entra ID sign-in. Must parse and name a database. | _(blank)_ | Yes |
+| `SqlDb:CommandTimeoutSeconds` | Seconds a command may run before it's abandoned. | `30` | No, range 1–600 |
+| `SqlDb:MaxRetryCount` | Times a transient failure is retried (`EnableRetryOnFailure`). | `6` | No, range 0–10 |
+| `SqlDb:MaxRetryDelaySeconds` | Longest delay between two retries, in seconds. | `30` | No, range 1–300 |
+| `SqlDb:ApplyMigrationsOnStartup` | Run `Database.MigrateAsync` on startup. **Development only** — production has no DDL rights and applies an idempotent script or a migrations bundle from its own pipeline instead (see the [runbook](runbook.md#provisioning-the-policy-database)). | `false` | No |
+
+The validator never echoes `ConnectionString` in a failure message, since it can carry a password — a startup failure names the key, not the value. Key Vault secret name: `SqlDb--ConnectionString`. See [Architecture overview](../architecture/overview.md#the-corepolicy-table) for the schema this produces and [ADR-0002](../adr/0002-sql-server-policy-store.md) for why SQL Server sits alongside Cosmos DB.
+
+`Logging:LogLevel:Microsoft.EntityFrameworkCore.Database.Command` is set to `Warning` in `appsettings.json`, so EF's per-command SQL logging (Information by default) doesn't dominate the log at normal levels; command text carries no caller-supplied values worth exposing at Warning either way, since parameters are logged separately and sensitive-data logging is never turned on.
+
 ## `Sessions`
 
 | Key | Meaning | Default | Required |

@@ -32,6 +32,13 @@
     <PackageVersion Include="Azure.Extensions.AspNetCore.Configuration.Secrets" Version="1.5.2" />
   </ItemGroup>
 
+  <!-- EF Core 10 resolves Microsoft.Data.SqlClient 6.1, which still bundles the Entra ID providers. SqlClient 7 moved them
+       into Microsoft.Data.SqlClient.Extensions.Azure, which an Authentication=Active Directory connection string then needs. -->
+  <ItemGroup Label="SQL Server">
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.12" />
+  </ItemGroup>
+
   <ItemGroup Label="Web">
     <PackageVersion Include="Microsoft.Identity.Web" Version="4.14.2" />
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />

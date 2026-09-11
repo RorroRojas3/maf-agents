@@ -103,15 +103,17 @@ Provider-first: store-agnostic contracts sit at the top, and everything one tech
 │  └─ <Feature>Exceptions.cs        store-shaped exceptions the contract documents, thrown by every provider
 └─ <Provider>/                      Sql/, Mongo/, Blob/ — everything one technology needs
    ├─ <Provider>PersistenceConfiguration.cs   public static Add<Prefix><Provider>Persistence(IServiceCollection, IConfiguration)
-   ├─ <Provider>HealthCheck.cs      internal; exposed through Add<Prefix><Provider>HealthCheck(IHealthChecksBuilder, …)
    ├─ <Provider>Queries.cs  <Provider>Records.cs  <Provider>Containers.cs   client, connection and query plumbing
+   ├─ HealthChecks/<Provider>HealthCheck.cs   internal; exposed through Add<Prefix><Provider>HealthCheck(IHealthChecksBuilder, …)
    ├─ Options/<Provider>DbOptions.cs          + its validator, in the same file
+   ├─ Provisioning/                 <Provider>ResourceProvisioner.cs, <Provider>SchemaMigrator.cs — create or migrate the store when an Api/Startup bootstrapper asks
    ├─ Serialization/                converters and serializer settings this store needs
    ├─ DbContexts/  Configurations/  Migrations/   EF providers only: <RootShort>DbContext.cs, IEntityTypeConfiguration<T> mirroring the Entity folders, `dotnet ef migrations add` output
+   ├─ Interceptors/                 EF providers only: <Name>Interceptor.cs, one per file — save-changes, command and connection interceptors
    └─ <Feature>/<Provider><Entity>Repository.cs   the implementation, named for the store it talks to
 ```
 
-The provider folder owns its own DI, so the composition root sequences one call per store and holds no client construction. A non-EF store simply has no `DbContexts/`, `Configurations/` or `Migrations/`.
+The provider folder owns its own DI, so the composition root sequences one call per store and holds no client construction. A health check and an interceptor are `internal` and attached inside the provider's `Add<Prefix><Provider>…` extensions, so the composition root never names either type. A provisioning type is `public` because an `Api/Startup/` bootstrapper resolves it: the bootstrapper decides *whether* to run, the provider type knows *how*, so Api never makes a store-specific call. A non-EF store simply has no `DbContexts/`, `Configurations/`, `Interceptors/` or `Migrations/`.
 
 ### `<Root>.Entity`
 
@@ -172,7 +174,8 @@ tests/<Root>.Integration.Test/
 | a per-provider registration for a model or external API | `Api/Configuration/Providers/` | `<Provider>ProviderConfiguration.cs`, `Add<Provider>Provider` |
 | **a persistence provider** | `Repository/<Provider>/` | the technology's proper name — `Sql/`, `Mongo/` |
 | **a persistence registration** | `Repository/<Provider>/` | `<Provider>PersistenceConfiguration.cs`, `Add<Prefix><Provider>Persistence` |
-| **a store health probe** | `Repository/<Provider>/` | `<Provider>HealthCheck.cs`, internal, plus `Add<Prefix><Provider>HealthCheck`; the name, tag and route stay in `Api/Health/` |
+| **a store health probe** | `Repository/<Provider>/HealthChecks/` | `<Provider>HealthCheck.cs`, internal, plus `Add<Prefix><Provider>HealthCheck`; the name, tag and route stay in `Api/Health/` |
+| **a store provisioner or schema migrator** | `Repository/<Provider>/Provisioning/` | `<Provider>ResourceProvisioner.cs` / `<Provider>SchemaMigrator.cs`, public; run by an `Api/Startup/<Name>Bootstrapper.cs` |
 | an options class read only by Api | `Api/Options/` | `<Area>Options.cs` with `SectionName` + validator |
 | an options class read by Service | `Service/Options/` | `<Area>Options.cs` with `SectionName` + validator |
 | **an options class read by a store** | `Repository/<Provider>/Options/` | `<Provider>DbOptions.cs` with `SectionName` + validator |
@@ -188,6 +191,7 @@ tests/<Root>.Integration.Test/
 | a repository implementation | `Repository/<Provider>/<Feature>/` | `<Provider><Entity>Repository.cs` |
 | an EF configuration | `Repository/<Provider>/Configurations/<Feature>/` | `<Entity>Configuration.cs` |
 | a migration | `Repository/<Provider>/Migrations/` | `dotnet ef migrations add <Verb><Subject>` |
+| **an EF interceptor** | `Repository/<Provider>/Interceptors/` | `<Name>Interceptor.cs`, internal, one per file; attached in `<Provider>PersistenceConfiguration.cs` |
 | an enum | `Common/Enums/` | `<Enums>.cs`, plural |
 | an enum's wire names | `Service/<Feature>/` | `<Enum>Names.cs`, static |
 | a constant catalog | `Common/Constants/` | `<Catalog>.cs` (`PermissionIds`, `TelemetryNames`) |
@@ -202,7 +206,7 @@ tests/<Root>.Integration.Test/
 | a middleware | `Api/Middleware/` | `<Name>Middleware.cs` + `<Name>Registration.cs` |
 | an endpoint filter | `Api/Filters/` | `<Name>EndpointFilter.cs`, static `Require(...)` factory |
 | an exception handler | `Api/ExceptionHandlers/` | `<Name>ExceptionHandler.cs` |
-| a health check | `Api/Health/` (or the owning `Repository/<Provider>/`) | `<Name>HealthCheck.cs`; registered in `HealthRegistration.cs` |
+| a health check | `Api/Health/` (or the owning `Repository/<Provider>/HealthChecks/`) | `<Name>HealthCheck.cs`; registered in `HealthRegistration.cs` |
 | a startup validator | `Api/Startup/` | `<Name>Bootstrapper.cs` |
 | a unit test | `tests/<Root>.Unit.Test/<ProjectShortName>/<Folder>/` | `<Type>Tests.cs` |
 | an integration test | `tests/<Root>.Integration.Test/<Feature>/` or `Endpoints/` | `<Subject>IntegrationTests.cs` |
@@ -213,8 +217,8 @@ tests/<Root>.Integration.Test/
 | Thing | Convention | Examples |
 |---|---|---|
 | Projects | `<Root>.<Layer>`; tests `<Root>.Unit.Test`, `<Root>.Integration.Test` | `Contoso.Shop.Service` |
-| Folders — collections of like types | plural | `Endpoints`, `Enums`, `Options`, `Configurations`, `<Feature>` |
-| Folders — techniques and infrastructure | gerund or mass noun | `Extraction`, `Caching`, `Middleware`, `Health`, `Observability`, `Configuration`, `Validation` |
+| Folders — collections of like types | plural | `Endpoints`, `Enums`, `Options`, `Configurations`, `HealthChecks`, `Interceptors`, `<Feature>` |
+| Folders — techniques and infrastructure | gerund or mass noun | `Extraction`, `Caching`, `Middleware`, `Health`, `Observability`, `Configuration`, `Provisioning`, `Validation` |
 | Folders — persistence providers | the technology's proper name | `Sql`, `Mongo`, `Blob` |
 | File names | == the type name, except grouped files, and a validator beside the type it validates | `OrderService.cs`; `OrdersRecords.cs`; `ExportOptions.cs` holding `ExportOptionsValidator` |
 | Grouped files | `<Folder>Classes/Records/Structs/Constants/Exceptions.cs` | `ExtractionRecords.cs` |
@@ -230,6 +234,8 @@ tests/<Root>.Integration.Test/
 | Filters | `<Name>EndpointFilter`, static `Require(...)` | `PermissionEndpointFilter` |
 | Exception handlers | `<Name>ExceptionHandler` | `ValidationExceptionHandler` |
 | Health checks | `<Name>HealthCheck` | `DatabaseHealthCheck` |
+| EF interceptors | `<Name>Interceptor`, named for what it does | `AuditTimestampInterceptor`, `SoftDeleteInterceptor` |
+| Store provisioning | `<Provider>ResourceProvisioner` creates resources; `<Provider>SchemaMigrator` applies migrations | `MongoResourceProvisioner`, `SqlSchemaMigrator` |
 | Startup | `<Name>Bootstrapper` | `SchemaBootstrapper` |
 | Enums | plural, one per file | `JobStatuses`, `SortDirections` |
 | Enum wire names | `<Enum>Names` | `JobStatusNames` |

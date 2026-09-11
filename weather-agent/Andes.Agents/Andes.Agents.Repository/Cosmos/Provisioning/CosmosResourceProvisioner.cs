@@ -1,6 +1,6 @@
 using Microsoft.Azure.Cosmos;
 
-namespace Andes.Agents.Repository.Cosmos;
+namespace Andes.Agents.Repository.Cosmos.Provisioning;
 
 /// <summary>Creates the database and containers when they do not exist.</summary>
 /// <remarks>

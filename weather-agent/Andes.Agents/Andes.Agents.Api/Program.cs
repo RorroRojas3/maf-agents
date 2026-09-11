@@ -7,6 +7,7 @@ using Andes.Agents.Api.Observability;
 using Andes.Agents.Api.Problems;
 using Andes.Agents.Api.Startup;
 using Andes.Agents.Repository.Cosmos;
+using Andes.Agents.Repository.Sql;
 using Microsoft.Extensions.Options;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
@@ -25,6 +26,7 @@ builder.Services.AddAndesHealthChecks();
 builder.Services.AddAndesOpenApi(builder.Configuration);
 builder.Services.AddAndesAzureCredential(builder.Configuration);
 builder.Services.AddAndesCosmosPersistence(builder.Configuration);
+builder.Services.AddAndesSqlPersistence(builder.Configuration);
 builder.Services.AddCoreServices();
 builder.Services.AddWeather();
 builder.Services.AddMicrosoftFoundryProvider(builder.Configuration);
@@ -54,4 +56,5 @@ app.MapSessionEndpoints();
 app.Services.GetRequiredService<IStartupValidator>().Validate();
 
 await app.EnsureCosmosResourcesAsync();
+await app.MigrateSqlDatabaseAsync();
 await app.RunAsync();
