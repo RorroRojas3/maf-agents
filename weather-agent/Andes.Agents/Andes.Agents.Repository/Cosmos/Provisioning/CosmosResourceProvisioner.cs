@@ -1,6 +1,6 @@
 using Microsoft.Azure.Cosmos;
 
-namespace Andes.Agents.Repository.Cosmos;
+namespace Andes.Agents.Repository.Cosmos.Provisioning;
 
 /// <summary>Creates the database and containers when they do not exist.</summary>
 /// <remarks>
@@ -14,7 +14,7 @@ public sealed class CosmosResourceProvisioner(CosmosClient client, CosmosContain
     private readonly CosmosClient _client = client;
     private readonly CosmosContainerNames _names = names;
 
-    /// <summary>Ensures the database and both containers exist with the partition key, TTL and indexing policy the repositories expect.</summary>
+    /// <summary>Creates the database and both containers when missing; an existing container keeps its own TTL and indexing policy.</summary>
     public async Task EnsureCreatedAsync(CancellationToken cancellationToken)
     {
         Database database = await _client
@@ -37,6 +37,9 @@ public sealed class CosmosResourceProvisioner(CosmosClient client, CosmosContain
             // TTL on with no default, so retention can later be set per document without recreating the container.
             DefaultTimeToLive = -1,
         };
+
+        // A policy that lists any path must also list the root, or the service rejects the container with a 400.
+        properties.IndexingPolicy.IncludedPaths.Add(new IncludedPath { Path = "/*" });
 
         // The excluded path is the one opaque blob each document carries; indexing it costs RUs on every write for nothing.
         properties.IndexingPolicy.ExcludedPaths.Add(new ExcludedPath { Path = excludedPath });

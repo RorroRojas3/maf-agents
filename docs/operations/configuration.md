@@ -98,6 +98,22 @@ Bound by `Repository/Cosmos/Options/CosmosDbOptions.cs` — the store's own proj
 
 Key Vault secret name: `CosmosDb--Key`. See [Sessions and history](../conversations/sessions-and-history.md#data-model) for the container definitions this produces.
 
+## `SqlDb` — the policy database
+
+Bound by `Repository/Sql/Options/SqlDbOptions.cs` — the store's own project, not Api — and registered by `AddAndesSqlPersistence`, which `Program.cs` calls directly. Backs `PolicyDbContext`, the only consumer of `Microsoft.EntityFrameworkCore.*` in the solution (see [Architecture overview](../architecture/overview.md#where-things-live)).
+
+| Key | Meaning | Default | Required |
+|---|---|---|---|
+| `SqlDb:ConnectionString` | SQL Server connection string; its `Authentication` keyword chooses SQL login or Microsoft Entra ID sign-in. Must parse and name a database. | _(blank)_ | Yes |
+| `SqlDb:CommandTimeoutSeconds` | Seconds a command may run before it's abandoned. | `30` | No, range 1–600 |
+| `SqlDb:MaxRetryCount` | Times a transient failure is retried (`EnableRetryOnFailure`). | `6` | No, range 0–10 |
+| `SqlDb:MaxRetryDelaySeconds` | Longest delay between two retries, in seconds. | `30` | No, range 1–300 |
+| `SqlDb:ApplyMigrationsOnStartup` | Run `Database.MigrateAsync` on startup. **Development only** — production has no DDL rights and applies an idempotent script or a migrations bundle from its own pipeline instead (see the [runbook](runbook.md#provisioning-the-policy-database)). | `false` | No |
+
+The validator never echoes `ConnectionString` in a failure message, since it can carry a password — a startup failure names the key, not the value. Key Vault secret name: `SqlDb--ConnectionString`. See [Architecture overview](../architecture/overview.md#the-corepolicy-table) for the schema this produces and [ADR-0002](../adr/0002-sql-server-policy-store.md) for why SQL Server sits alongside Cosmos DB.
+
+`Logging:LogLevel:Microsoft.EntityFrameworkCore.Database.Command` is set to `Warning` in `appsettings.json`, so EF's per-command SQL logging (Information by default) doesn't dominate the log at normal levels; command text carries no caller-supplied values worth exposing at Warning either way, since parameters are logged separately and sensitive-data logging is never turned on.
+
 ## `Sessions`
 
 | Key | Meaning | Default | Required |
@@ -152,8 +168,19 @@ Applies to the A2A and AG-UI routes only (the `AgentTurns` policy) — `api/conv
 | Key | Meaning | Default | Required |
 |---|---|---|---|
 | `ApiDocs:Enabled` | Serve `/openapi/v1.json` and the `/scalar` reference UI outside Development. | `false` | No |
+| `ApiDocs:ClientId` | Application (client) id Scalar signs in with — the API's own registration or a separate public-client registration. Blank leaves Scalar with a pasted bearer token only. | _(blank)_ | No |
+| `ApiDocs:Scopes` | Space-separated, **fully qualified** scopes Scalar requests, e.g. `api://<api-client-id>/access_as_user`. | _(blank)_ | Once `ClientId` is set |
 
-The Development environment serves both regardless of this flag; `appsettings.Development.json` also sets it to `true` explicitly.
+The Development environment serves both regardless of `ApiDocs:Enabled`; `appsettings.Development.json` also sets it to `true` explicitly.
+
+**Scalar sign-in.** With `ApiDocs:ClientId` set, the OpenAPI document declares two security schemes and lists them on every operation as separate requirements, so either alone satisfies it:
+
+- `Bearer` — the existing HTTP scheme, paste a token.
+- `EntraId` — an OAuth2 authorization-code flow, `authorizationUrl`/`tokenUrl` built from `AzureAd:Instance`/`AzureAd:TenantId` (or `AzureAd:Authority`, with any trailing `/v2.0` removed), scopes from `ApiDocs:Scopes`.
+
+Scalar preselects `EntraId` and `ApiDocs:Scopes`, and uses PKCE (S256) with no client secret. It requests `response_mode=fragment`, so the authorization code returns in the URL fragment and never reaches the server or Application Insights request telemetry. The redirect URI is built per request as `{scheme}://{host}{pathBase}/scalar/`; `X-Forwarded-Proto` is honored so the scheme is correct behind a TLS-terminating ingress, but `X-Forwarded-Host` is not. With `ApiDocs:ClientId` blank, behavior is unchanged: `Bearer` only, preselected.
+
+`ApiDocs:ClientId` set with `ApiDocs:Scopes` empty fails startup, naming both keys. See the [runbook](runbook.md#configure-user-secrets) for the Entra ID app registration steps and [troubleshooting](runbook.md#troubleshooting) for the sign-in failures those steps prevent.
 
 ## Development overrides at a glance
 

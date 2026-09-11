@@ -1,7 +1,7 @@
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
-namespace Andes.Agents.Repository.Cosmos;
+namespace Andes.Agents.Repository.Cosmos.HealthChecks;
 
 internal sealed class CosmosHealthCheck(ICosmosContainers containers) : IHealthCheck
 {

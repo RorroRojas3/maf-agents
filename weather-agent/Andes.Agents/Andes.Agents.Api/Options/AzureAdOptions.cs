@@ -12,6 +12,8 @@ public sealed class AzureAdOptions
     /// <summary>Configuration section these options bind from.</summary>
     public const string SectionName = "AzureAd";
 
+    private const string _v2Suffix = "/v2.0";
+
     /// <summary>Gets or sets the cloud the tenant lives in.</summary>
     public string Instance { get; set; } = "https://login.microsoftonline.com/";
 
@@ -40,6 +42,19 @@ public sealed class AzureAdOptions
     public bool HasAuthority() =>
         !string.IsNullOrWhiteSpace(Authority)
         || (!string.IsNullOrWhiteSpace(Instance) && !string.IsNullOrWhiteSpace(TenantId));
+
+    /// <summary>The tenant's base URL, under which its OAuth 2.0 endpoints sit; only callable once validation has passed.</summary>
+    public string GetTenantUrl()
+    {
+        if (!string.IsNullOrWhiteSpace(Instance) && !string.IsNullOrWhiteSpace(TenantId))
+        {
+            return $"{Instance.TrimEnd('/')}/{TenantId}";
+        }
+
+        string authority = Authority!.TrimEnd('/');
+
+        return authority.EndsWith(_v2Suffix, StringComparison.OrdinalIgnoreCase) ? authority[..^_v2Suffix.Length] : authority;
+    }
 
     /// <summary>The scopes a delegated caller must hold.</summary>
     public string[] GetScopes() => Split(Scopes);
