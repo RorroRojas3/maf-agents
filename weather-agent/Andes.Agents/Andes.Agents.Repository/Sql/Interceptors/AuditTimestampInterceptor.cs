@@ -40,16 +40,32 @@ internal sealed class AuditTimestampInterceptor(TimeProvider timeProvider) : Sav
         {
             switch (entry.State)
             {
+                // A value the caller set is kept: a projection carries the timestamps of the record it copies.
                 case EntityState.Added:
-                    entry.Entity.DateCreated = now;
-                    entry.Entity.DateUpdated = now;
+                    if (entry.Entity.DateCreated == default)
+                    {
+                        entry.Entity.DateCreated = now;
+                    }
+
+                    if (entry.Entity.DateModified == default)
+                    {
+                        entry.Entity.DateModified = now;
+                    }
+
                     break;
 
                 case EntityState.Modified:
-                    entry.Entity.DateUpdated = now;
+                    if (!HasChanged(entry.Property(entity => entity.DateModified)))
+                    {
+                        entry.Entity.DateModified = now;
+                    }
+
                     entry.Property(entity => entity.DateCreated).IsModified = false;
                     break;
             }
         }
     }
+
+    // Against the original value, not IsModified: a disconnected Update marks every property modified.
+    private static bool HasChanged(PropertyEntry<BaseEntity, DateTimeOffset> property) => property.CurrentValue != property.OriginalValue;
 }

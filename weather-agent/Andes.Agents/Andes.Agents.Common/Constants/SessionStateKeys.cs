@@ -8,4 +8,7 @@ public static class SessionStateKeys
 
     /// <summary>Cumulative token usage of the session.</summary>
     public const string Usage = "andes.usage";
+
+    /// <summary>Cumulative cached input and reasoning tokens; a key of its own, so a build that only knows <see cref="Usage"/> carries it through unchanged.</summary>
+    public const string UsageDetails = "andes.usage.details";
 }

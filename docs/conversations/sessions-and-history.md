@@ -4,7 +4,9 @@
 
 Every turn of the weather agent needs somewhere durable to keep the conversation, because the model client is configured with `store:false` (see [Hosting and protocols](../agent/hosting-and-protocols.md)) — Cosmos DB is the *only* place a session's state and message history live. Two Cosmos DB containers hold it: `sessions` (one document per conversation) and `messages` (one document per chat message). A caller resumes a conversation by sending back the same continuation id — the A2A `contextId` or the AG-UI `threadId` — which becomes the Cosmos DB `id` and partition value.
 
-This page covers the document shapes, how the Microsoft Agent Framework session store and history provider read and write them, what happens when two turns race, and the `api/conversations` REST resource that lets a caller browse and delete their own conversations.
+A separate, much smaller pipeline also projects each session's cumulative token usage into a SQL Server reporting row — never into the conversation itself, and never on the request path above. See [Session usage reporting](#session-usage-reporting).
+
+This page covers the document shapes, how the Microsoft Agent Framework session store and history provider read and write them, what happens when two turns race, the `api/conversations` REST resource that lets a caller browse and delete their own conversations, and how each session's usage is projected into SQL Server for reporting.
 
 ## Data model
 
@@ -22,9 +24,11 @@ Database `andes-agents`, both containers on the hierarchical partition key `[/us
 | `messageCount` | int | Number of messages stored for the session. |
 | `usage` | `SessionUsage` | Cumulative `{ inputTokens, outputTokens, totalTokens }` across every turn. |
 | `dateCreated` | DateTimeOffset | UTC time the session was created. |
-| `dateUpdated` | DateTimeOffset | UTC time of the last save. |
+| `dateModified` | DateTimeOffset | UTC time of the last save. |
 | `lastMessageAt` | DateTimeOffset? | UTC time of the last stored message. |
 | `state` | JSON | The Agent Framework's own serialized `AgentSession`; opaque to this application. Excluded from indexing (see below). |
+
+This field was renamed from `dateUpdated`, to match `[Core].[Session].DateModified` below: a document written before the rename still carries `dateUpdated` on disk, so `SessionDocument.DateModified` reads as its default value until that session's next save overwrites the document with the new field name. `api/conversations` returns `dateModified` on `SessionDto` for the same reason — a breaking change for any existing client reading `dateUpdated`.
 
 ### `messages` container — `SessionMessageDocument`
 
@@ -87,12 +91,41 @@ Two failure modes are made visible instead of silently corrupting a session, bot
 
 ### Session id validation
 
-A continuation id becomes a Cosmos DB document id and partition value, so `SessionIdValidator` rejects, before any I/O:
+A continuation id becomes a Cosmos DB document id and partition value, and — now that it's also `[Core].[Session].SessionId`, a `uniqueidentifier` — it has to parse as a GUID. `SessionIdValidator` accepts only the hyphenated (`D`, 36 characters) or plain (`N`, 32 characters) form and rejects everything else — padded, braced, or any other shape — before any I/O happens. Both hosts issue an `N` id when the client sends none, and a continuation reuses whatever form the client already has.
 
-- an id longer than 255 characters (`SessionIdRules.MaxLength`), and
-- an id containing any of `/ \ ? #` (`SessionIdRules.InvalidCharacters`) — characters Cosmos DB forbids in an `id`.
+A rejection is `InvalidSessionIdException`, and how it reaches the caller depends on the protocol:
 
-A rejection is `InvalidSessionIdException` → **HTTP 400, problem type `validation-error`**.
+- **AG-UI and `api/conversations`** get the usual **HTTP 400, problem type `validation-error`**.
+- **A2A** needs a translation step first: the A2A server turns any exception it doesn't recognize into a 500 (HTTP+JSON) or an internal JSON-RPC error, which would hide what's actually a caller mistake. `AgentsConfiguration` wraps the session store in a private `A2AErrorTranslatingSessionStore` that catches `InvalidSessionIdException` and rethrows it as `A2AException(A2AErrorCode.InvalidParams)`. The A2A server then answers **HTTP 400** on HTTP+JSON or **JSON-RPC error `-32602`** on JSON-RPC, and `GlobalExceptionHandler` maps that same `A2AException` shape to the ordinary `validation-error` problem — so a caller on either protocol sees the same kind of rejection.
+
+## Session usage reporting
+
+Independently of the conversation itself, `[Core].[Session]` (entity `SessionSummary`) keeps one SQL Server row per session — cumulative message and token counts and a running USD cost — for reporting that a document store doesn't answer well: aggregating across sessions, grouping by agent or model, filtering by period. See [Architecture overview](../architecture/overview.md#the-agent-catalog-and-session-usage-summaries) for the schema and [ADR-0003](../adr/0003-database-owned-agent-catalog-and-session-usage.md) for why this is a background projection rather than a write on the turn.
+
+**Usage collection.** `UsageRecordingAgent` keeps two keys in the session's state bag: `andes.usage` (`SessionUsage` — input, output, total) and `andes.usage.details` (`SessionUsageDetails` — cached input tokens and reasoning tokens). The details live under their own key so a build that only knows `andes.usage` still round-trips `andes.usage.details` unchanged during a rollback, instead of dropping it. Cached tokens are already counted inside input tokens, and reasoning tokens inside output tokens, the way `Microsoft.Extensions.AI` 10.9.0 reports them.
+
+**Enqueue on save.** Once `PersistedAgentSessionStore.SaveSessionAsync` has created or replaced the Cosmos DB session document — never before that write succeeds — it hands the session's state, usage, and details to `ISessionSummaryChannel.EnqueueTurn`. Enqueueing never blocks and never throws.
+
+**Enqueue on delete.** `SessionService.DeleteAsync` (the `api/conversations` resource) calls `EnqueueDeletion` with the deleted document's own counts, after the Cosmos DB deletes succeed. `PersistedAgentSessionStore.DeleteSessionAsync` does the same, reading the document first — no host calls it today, but the store's contract requires it regardless.
+
+**The channel.** Bounded at 10,000 items; a full channel, or a user or session id that doesn't parse as a GUID, drops the item with a warning that names no values.
+
+**The writer.** `SessionSummaryProcessor`, a `BackgroundService`, drains the channel in order. For each item it reads the agent catalog cache (see [Architecture overview](../architecture/overview.md#the-agent-catalog-and-session-usage-summaries)) to find the item's agent's active model, then calls `ISessionSummaryRepository.UpsertAsync`.
+
+**Merging a write (`SqlSessionSummaryRepository`).** Each attempt reads the row by `(UserId, SessionId, DateCreated)`:
+
+- **Stale write.** Any count lower than what's already stored belongs to an older write and changes nothing.
+- **Growth.** The delta is priced with `TokenPrices.CostOf` — `((input − cached) × input price + cached × cached-input price + output × output price) ÷ 1,000,000`, cached clamped to `[0, input]`, rounded to 9 decimals — and added to `EstimatedCost`. A turn written late is priced at the model's price when it's written, not when the turn ran.
+- **Deletion.** Merges the document's own counts (its cached and reasoning tokens are left as already stored, since a deletion doesn't carry them) and stamps `DateDeleted` if it's still null; the stamp is never cleared, and a deletion that arrives before any turn was ever written inserts a stamped row.
+- **Concurrency.** A rowversion conflict or a duplicate-key error (2601/2627) re-reads the row and tries again, up to 3 attempts in all, so two writers racing on the same row never double-count.
+
+**Failure handling.** A catalog read failure retries with exponential backoff from 5 seconds up to 5 minutes. A missing hosted agent invalidates the catalog cache and retries — startup already proved every hosted agent has a model, so a miss here means a mapping swap landed mid-read. An agent that isn't in `AgentNames.All` at all — a deleted document naming an agent this host no longer runs — is dropped with a warning. `SessionStoreUnavailableException` (EF's retries exhausted, or a `SqlException` of severity 17 — the server out of log space, disk, memory, or locks — or severity 20 and above, a lost connection, or a −2/258 timeout) gets the same backoff. Anything else is dropped and logged by **exception type names only** — a `SqlException` message can quote the row's key, which holds the caller's `oid`.
+
+**Shutdown.** `SessionSummaryProcessor.StopAsync` completes the channel and waits for the running loop to finish within `HostOptions.ShutdownTimeout`; if the store is down, it stops retrying and returns promptly instead of holding up shutdown.
+
+**Residual loss (documented, not a bug).** A crash, a channel that was already full, or a non-transient failure can lose a queued write. The session's next save or deletion re-sends its complete counts, so the gap closes on the next turn — except a lost deletion stamp, which stays lost until an operator notices.
+
+**AG-UI caveat.** The AG-UI host does not call `SaveSessionAsync` for a stream that failed, or that the client abandoned before it finished — a known limitation of the hosting package, not of this pipeline — so that turn's usage never reaches Cosmos DB or the SQL summary either.
 
 ## The `api/conversations` REST resource
 

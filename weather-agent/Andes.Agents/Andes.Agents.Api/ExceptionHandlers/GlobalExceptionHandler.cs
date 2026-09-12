@@ -1,3 +1,4 @@
+using A2A;
 using Andes.Agents.Api.Observability;
 using Andes.Agents.Api.Problems;
 using Andes.Agents.Service.Exceptions;
@@ -58,6 +59,9 @@ internal sealed partial class GlobalExceptionHandler(ILogger<GlobalExceptionHand
         ValidationException validation =>
             new(StatusCodes.Status400BadRequest, "The request is not valid", ProblemTypes.ValidationError, "One or more parameters are not valid.", ToErrors(validation)),
         InvalidSessionIdException =>
+            new(StatusCodes.Status400BadRequest, "The request is not valid", ProblemTypes.ValidationError, exception.Message),
+        // The session store raises the A2A form so the A2A server can answer it; AG-UI brings it here.
+        A2AException { ErrorCode: A2AErrorCode.InvalidParams } =>
             new(StatusCodes.Status400BadRequest, "The request is not valid", ProblemTypes.ValidationError, exception.Message),
         ForbiddenException =>
             new(StatusCodes.Status403Forbidden, "Forbidden", ProblemTypes.Forbidden, exception.Message),

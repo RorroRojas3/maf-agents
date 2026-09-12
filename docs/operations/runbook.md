@@ -228,9 +228,46 @@ Open the Data Explorer at `http://localhost:1234` (or your target account's Data
 - `sessions`: one document per conversation exercised above, `_etag` different after the second turn than after the first.
 - `messages`: one document per message, `sequence` contiguous from `1`, `id` shaped `{sessionId}:{sequence:D8}`.
 
+### Verify session usage in SQL Server
+
+Give the background writer a moment after the turns above (it writes off the request path — see [Sessions and history](../conversations/sessions-and-history.md#session-usage-reporting)), then check `[Core].[Session]` for a matching row per conversation:
+
+```sql
+SELECT s.SessionId, a.Name AS Agent, m.DeploymentName, s.MessageCount, s.InputTokens, s.OutputTokens, s.EstimatedCost, s.DateDeleted
+FROM [Core].[Session] s
+JOIN [Core.Ref].[Agent] a ON a.Id = s.AgentId
+JOIN [Core.Ref].[Model] m ON m.Id = s.ModelId
+ORDER BY s.DateCreated DESC;
+```
+
+Expect one row per session with a non-zero `EstimatedCost` and `DateDeleted` null; after a `DELETE api/conversations/{sessionId}` above, the same row's `DateDeleted` should be stamped and its counts unchanged. The same query, filtered or grouped, doubles as a general reporting query:
+
+```sql
+-- Cost per agent
+SELECT a.Name AS Agent, SUM(s.EstimatedCost) AS TotalCost
+FROM [Core].[Session] s
+JOIN [Core.Ref].[Agent] a ON a.Id = s.AgentId
+GROUP BY a.Name;
+
+-- Cost per model
+SELECT m.DeploymentName, SUM(s.EstimatedCost) AS TotalCost
+FROM [Core].[Session] s
+JOIN [Core.Ref].[Model] m ON m.Id = s.ModelId
+GROUP BY m.DeploymentName;
+
+-- Every agent's currently active model
+SELECT a.Name AS Agent, m.DeploymentName, m.InputPricePerMillionTokens, m.CachedInputPricePerMillionTokens, m.OutputPricePerMillionTokens
+FROM [Core.Ref].[AgentModelMapping] map
+JOIN [Core.Ref].[Agent] a ON a.Id = map.AgentId
+JOIN [Core.Ref].[Model] m ON m.Id = map.ModelId
+WHERE map.DateDeactivated IS NULL;
+```
+
+All three are read-only and safe to run against a live database at any time.
+
 ### Verify telemetry
 
-With `Telemetry:ConnectionString` set, run a turn and check Application Insights for the nested span shape and metric documented in [Hosting and protocols](../agent/hosting-and-protocols.md#telemetry) — `invoke_agent weather-agent` → `chat rrp-gpt-5.6-luna` → `execute_tool get_current_weather`, and a `gen_ai.client.token.usage` data point.
+With `Telemetry:ConnectionString` set, run a turn and check Application Insights for the nested span shape and metric documented in [Hosting and protocols](../agent/hosting-and-protocols.md#telemetry) — `invoke_agent weather-agent` → `chat rr-gpt-5.6-luna` → `execute_tool get_current_weather`, and a `gen_ai.client.token.usage` data point.
 
 ### Scalar
 
@@ -296,6 +333,8 @@ dotnet tool run dotnet-ef migrations bundle \
 ```
 
 **Never regenerate a migration to absorb a CLR rename** — renaming a mapped property or the migration class itself. Edit the type-name strings the generated migration and its designer file already contain, then rerun `migrations has-pending-model-changes` to confirm the model and the migration still match. `.editorconfig` marks everything under `Sql/Migrations/` as generated code precisely so `dotnet format` never rewrites it out from under a hand edit like this.
+
+**`CreateSessionReportingTables` carries two hand-written `InsertData` calls** — the `GPT 5.6 Luna` model and the weather agent's mapping to it. Operators own those rows once they exist, so the EF model deliberately doesn't know them; only agents are `HasData`, keyed by `Common/Constants/AgentIds.cs`. Regenerating that migration drops both calls: put them back if it ever has to be regenerated, and never move them into `HasData`, which would hand their values back to future migrations.
 
 ## Provisioning Cosmos DB with IaC
 
@@ -366,16 +405,67 @@ Grant the application's managed identity a Cosmos DB **data-plane** role assignm
 
 The same split as Cosmos DB above applies here, one layer down: outside Development, the identity the app runs as holds no DDL rights, so schema changes are a pipeline step, not something `dotnet run` does. The pipeline applies one of the two artifacts from [Migrations](#migrations) — the idempotent script through whatever SQL execution step it already has, or a migrations bundle where it would rather ship one self-contained executable than carry the EF tooling — using an identity that *does* hold DDL rights on the target database.
 
-The application itself then connects as a narrower principal: a SQL login, or on Azure SQL a contained database user, holding only data rights on the `Core` schema:
+**Migrate before you deploy the app.** Since this change, startup runs `AgentCatalogBootstrapper` right after migrating (see [Architecture overview](../architecture/overview.md#startup-order)), and it needs `[Core.Ref]` — and the seed rows in it — to already exist. Rolling out a new app version before its migration has been applied means every instance fails to start rather than serving traffic against a schema it doesn't recognize; this was already good practice for `[Core].[Policy]`, and is now a hard startup dependency instead of just a data one.
+
+Apply the idempotent script — and any hand edit of `[Core.Ref]` rows, further down — with `sqlcmd -I`:
+
+```bash
+sqlcmd -S <server> -d <database> -I -b -i policy-migrations.sql
+```
+
+`-I` turns on `SET QUOTED_IDENTIFIER ON` for the session. `[Core.Ref].[AgentModelMapping]`'s filtered unique index needs that on for any DDL or DML against the table, and the ODBC `sqlcmd` — both `/opt/mssql-tools18/bin/sqlcmd` in the container and the Windows ODBC build — defaults it **off**; without `-I` the statement fails with error **1934**. Verified on SQL Server 2025. The ODBC `sqlcmd` also treats any `/` as an option prefix, even inside a path, so `-i C:/path/policy-migrations.sql` fails with "Error occurred while opening or operating on file C:"; pass a backslash path (`-i "$(cygpath -w policy-migrations.sql)"` from Git Bash).
+
+The application itself then connects as a narrower principal: a SQL login, or on Azure SQL a contained database user, holding only data rights on the `Core` schema, plus read access to the catalog:
 
 ```sql
 CREATE USER [andes-agents-app] FOR LOGIN [andes-agents-app]; -- or FROM EXTERNAL PROVIDER on Azure SQL, for a managed identity
 GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::Core TO [andes-agents-app];
+GRANT SELECT ON SCHEMA::[Core.Ref] TO [andes-agents-app];
 ```
+
+`[Core.Ref]` is operator-written, never app-written, so the app only needs `SELECT` there; the existing `Core` grant already covers `[Core].[Session]`, since it's just another table in the schema the app already has full rights to. Always bracket `[Core.Ref]` in T-SQL — unqualified, `Core.Ref.Agent` parses as `database.schema.object` (database `Core`, schema `Ref`, table `Agent`), not schema `Core.Ref`.
 
 On Azure SQL, that principal is reached with Microsoft Entra ID rather than a SQL login: `Authentication=Active Directory Managed Identity;User Id=<client-id>` in `ConnectionStrings:DefaultConnection`. `Microsoft.Data.SqlClient` 6.1 — the version EF Core 10 resolves — still bundles the Entra ID authentication providers, so no extra package is needed for that connection-string keyword to work (see [ADR-0002](../adr/0002-sql-server-policy-store.md)); moving to SqlClient 7 would change that.
 
 The target database's compatibility level must be **170** (SQL Server 2025 or Azure SQL only) — `SqlPersistenceConfiguration.ConfigureSqlServer` sets it explicitly on every connection, migrations included, because EF Core otherwise assumes 150 and avoids newer T-SQL. A database created by the idempotent script or a bundle already carries this, since both are generated from the same configuration the app runs with.
+
+## Changing the agent catalog
+
+The catalog lives entirely in the database (see [Configuration](configuration.md#the-agent-catalog-is-not-configuration)). Both changes below are DML against `[Core.Ref]`, so run them through `sqlcmd -I` the same way as the idempotent script above; the filtered index on `[Core.Ref].[AgentModelMapping]` needs `QUOTED_IDENTIFIER ON` for these too.
+
+**Change a model's price** — no redeploy:
+
+```sql
+UPDATE [Core.Ref].[Model]
+SET InputPricePerMillionTokens = 0.25,
+    CachedInputPricePerMillionTokens = 0.025,
+    OutputPricePerMillionTokens = 1.50
+WHERE DeploymentName = 'rr-gpt-5.6-luna';
+```
+
+A running instance picks this up the next time its 24-hour cache reloads, or immediately after a restart (see [Architecture overview](../architecture/overview.md#the-agent-catalog-and-session-usage-summaries)).
+
+**Move an agent to a different model** — a database change, a configuration change and a restart. The filtered unique index on `AgentId` rejects a second active mapping (error 2601), so deactivate the old one before inserting the new one, in one transaction so no reader — the catalog cache reloading, or an instance starting — ever sees the agent with no active model. If `<new-deployment>` isn't in `[Core.Ref].[Model]` yet, insert that row first. `SET XACT_ABORT ON` matters here: without it, an INSERT that fails (a misspelled deployment makes `ModelId` NULL) leaves the batch running, and `COMMIT` keeps the deactivation.
+
+```sql
+SET XACT_ABORT ON;
+BEGIN TRANSACTION;
+
+UPDATE [Core.Ref].[AgentModelMapping]
+SET DateDeactivated = SYSDATETIMEOFFSET()
+WHERE AgentId = (SELECT Id FROM [Core.Ref].[Agent] WHERE Name = 'weather-agent')
+  AND DateDeactivated IS NULL;
+
+INSERT INTO [Core.Ref].[AgentModelMapping] (Id, AgentId, ModelId, DateCreated, DateModified)
+VALUES (NEWID(),
+        (SELECT Id FROM [Core.Ref].[Agent] WHERE Name = 'weather-agent'),
+        (SELECT Id FROM [Core.Ref].[Model] WHERE DeploymentName = '<new-deployment>'),
+        SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET());
+
+COMMIT TRANSACTION;
+```
+
+Then set `AzureOpenAI:Model` to `<new-deployment>` and restart the app. `AgentCatalogBootstrapper` checks the two agree at startup — see [Troubleshooting](#troubleshooting) for what it says when they don't.
 
 ## Deployment notes
 
@@ -421,6 +511,15 @@ The probe didn't get an answer inside its 5-second budget (`HealthRegistration`'
 
 **`dotnet run` (with `SqlDb:ApplyMigrationsOnStartup: true`) or `dotnet ef database update` fails, naming a pending model change.**
 Since EF Core 9, `Database.MigrateAsync` (and the CLI's `database update`) throw rather than apply migrations when the mapped model has changed since the last migration was generated — the same condition `migrations has-pending-model-changes` reports. Add the missing migration (see [Migrations](#migrations)) before running either one again; this is EF Core refusing to leave the database out of sync with the code, not a bug in `SqlSchemaMigrator`.
+
+**The application won't start, with a message naming `[Core.Ref].[AgentModelMapping]` and an agent name (`... has no active model for agent '<agent>'.`).**
+`AgentCatalogBootstrapper` found no active mapping for that agent — either the seed migration hasn't been applied yet (see [Migrations](#migrations)), or its mapping was deactivated without a replacement being inserted. Insert an active mapping for the agent; see [Changing the agent catalog](#changing-the-agent-catalog).
+
+**The application won't start, with a message reading "The agent catalog runs '\<agent\>' on deployment '\<x\>', but 'AzureOpenAI:Model' is '\<y\>'."**
+The catalog's active model for that agent and `AzureOpenAI:Model` name different deployments — usage would otherwise be priced and attributed to a model the app isn't actually calling. Either update the catalog to match the configured deployment, or set `AzureOpenAI:Model` to the catalog's deployment, whichever is actually correct, then restart; see [Changing the agent catalog](#changing-the-agent-catalog).
+
+**Applying `policy-migrations.sql`, or a hand edit of `[Core.Ref]` rows, fails with error 1934.**
+`QUOTED_IDENTIFIER` was off for the session. `[Core.Ref].[AgentModelMapping]`'s filtered unique index requires it on for any DDL or DML against that table, and the ODBC `sqlcmd` defaults it off. Rerun with `-I` (see [Provisioning the policy database](#provisioning-the-policy-database)).
 
 **Tracking down a failure a caller reported.**
 Every problem+json response carries `traceId` (the W3C trace id, and the Application Insights operation id — search for it there) and `requestId` (the connection-scoped id that same request's own log lines carry, from `RequestLoggingMiddleware` and `GlobalExceptionHandler` alike). Ask the caller for `traceId` first; it's the one that survives past this process.

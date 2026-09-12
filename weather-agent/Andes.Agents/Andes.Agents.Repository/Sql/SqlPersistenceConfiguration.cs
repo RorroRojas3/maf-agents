@@ -1,9 +1,13 @@
 using Andes.Agents.Common.Validation;
+using Andes.Agents.Repository.Agents.Interfaces;
+using Andes.Agents.Repository.Sessions.Interfaces;
+using Andes.Agents.Repository.Sql.Agents;
 using Andes.Agents.Repository.Sql.DbContexts;
 using Andes.Agents.Repository.Sql.HealthChecks;
 using Andes.Agents.Repository.Sql.Interceptors;
 using Andes.Agents.Repository.Sql.Options;
 using Andes.Agents.Repository.Sql.Provisioning;
+using Andes.Agents.Repository.Sql.Sessions;
 using FluentValidation;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -17,7 +21,7 @@ using Microsoft.Extensions.Options;
 
 namespace Andes.Agents.Repository.Sql;
 
-/// <summary>Registers the SQL Server store and the policy database built on it.</summary>
+/// <summary>Registers the SQL Server store and the repositories built on it.</summary>
 public static class SqlPersistenceConfiguration
 {
     private const string _applicationName = "Andes.Agents";
@@ -25,7 +29,7 @@ public static class SqlPersistenceConfiguration
     // SQL Server 2025 and Azure SQL. Without it EF assumes 150 (SQL Server 2019) and avoids newer T-SQL.
     private const int _compatibilityLevel = 170;
 
-    /// <summary>Binds the SQL Server section and default connection string, and registers the pooled policy context and its schema migrator.</summary>
+    /// <summary>Binds the SQL Server section and default connection string, and registers the pooled context, its schema migrator and the SQL repositories.</summary>
     public static IServiceCollection AddAndesSqlPersistence(this IServiceCollection services, IConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(services);
@@ -51,11 +55,13 @@ public static class SqlPersistenceConfiguration
         });
 
         services.AddScoped<SqlSchemaMigrator>();
+        services.AddScoped<IAgentModelMappingRepository, SqlAgentModelMappingRepository>();
+        services.AddScoped<ISessionSummaryRepository, SqlSessionSummaryRepository>();
 
         return services;
     }
 
-    /// <summary>Adds a readiness probe that runs a trivial query against the policy database.</summary>
+    /// <summary>Adds a readiness probe that runs a trivial query against the database.</summary>
     public static IHealthChecksBuilder AddAndesSqlHealthCheck(this IHealthChecksBuilder builder, string name, TimeSpan timeout, params string[] tags)
     {
         ArgumentNullException.ThrowIfNull(builder);

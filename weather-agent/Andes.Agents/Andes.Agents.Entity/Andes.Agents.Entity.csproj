@@ -4,4 +4,9 @@
     <ProjectReference Include="..\Andes.Agents.Common\Andes.Agents.Common.csproj" />
   </ItemGroup>
 
+  <!-- Mapping attributes only ([Precision], [Keyless]); the EF Core runtime stays in Repository. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Abstractions" />
+  </ItemGroup>
+
 </Project>

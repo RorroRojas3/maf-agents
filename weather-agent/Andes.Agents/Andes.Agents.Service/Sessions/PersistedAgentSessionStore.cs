@@ -19,12 +19,14 @@ public sealed class PersistedAgentSessionStore(
     ISessionRepository sessions,
     ISessionMessageRepository messages,
     PersistedChatHistoryProvider history,
+    ISessionSummaryChannel summaries,
     ICallerContext caller,
     TimeProvider timeProvider) : AgentSessionStore
 {
     private readonly ISessionRepository _sessions = sessions;
     private readonly ISessionMessageRepository _messages = messages;
     private readonly PersistedChatHistoryProvider _history = history;
+    private readonly ISessionSummaryChannel _summaries = summaries;
     private readonly ICallerContext _caller = caller;
     private readonly TimeProvider _timeProvider = timeProvider;
 
@@ -88,6 +90,7 @@ public sealed class PersistedAgentSessionStore(
         }
 
         SessionUsage usage = session.StateBag.GetValue<SessionUsage>(SessionStateKeys.Usage, SessionStateJson.Options) ?? SessionUsage.Empty;
+        SessionUsageDetails details = session.StateBag.GetValue<SessionUsageDetails>(SessionStateKeys.UsageDetails, SessionStateJson.Options) ?? SessionUsageDetails.Empty;
         JsonElement serialized = await agent.SerializeSessionAsync(session, cancellationToken: cancellationToken).ConfigureAwait(false);
 
         SessionDocument document = new(
@@ -99,7 +102,7 @@ public sealed class PersistedAgentSessionStore(
             MessageCount: state.MessageCount,
             Usage: usage,
             DateCreated: state.DateCreated,
-            DateUpdated: _timeProvider.GetUtcNow(),
+            DateModified: _timeProvider.GetUtcNow(),
             LastMessageAt: state.LastMessageAt,
             State: serialized);
 
@@ -115,6 +118,8 @@ public sealed class PersistedAgentSessionStore(
         {
             throw new ConversationBusyException("Another turn of this conversation completed first; retry with the latest state.", ex);
         }
+
+        _summaries.EnqueueTurn(state, usage, details, agent.Id);
     }
 
     /// <inheritdoc />
@@ -124,7 +129,15 @@ public sealed class PersistedAgentSessionStore(
 
         string userId = _caller.UserId;
 
+        // Read before deleting: the reporting summary is keyed by the document's creation time.
+        SessionRead? existing = await _sessions.GetAsync(userId, sessionStoreId, cancellationToken).ConfigureAwait(false);
+
         await _messages.DeleteAllAsync(userId, sessionStoreId, cancellationToken).ConfigureAwait(false);
         await _sessions.DeleteAsync(userId, sessionStoreId, cancellationToken).ConfigureAwait(false);
+
+        if (existing is not null)
+        {
+            _summaries.EnqueueDeletion(existing.Document);
+        }
     }
 }

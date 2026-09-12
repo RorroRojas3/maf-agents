@@ -23,3 +23,4 @@ Engineer-facing reference for `weather-agent/Andes.Agents/` — an ASP.NET Core 
 
 - [ADR-0001: Pin the preview Agent Framework hosting packages](adr/0001-preview-hosting-packages.md)
 - [ADR-0002: SQL Server 2025 as a second, relational store for policies](adr/0002-sql-server-policy-store.md)
+- [ADR-0003: A database-owned agent catalog and a background session-usage projection](adr/0003-database-owned-agent-catalog-and-session-usage.md)

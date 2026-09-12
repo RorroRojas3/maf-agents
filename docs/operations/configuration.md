@@ -66,9 +66,15 @@ The Responses API deployment that drives the agent, registered as the keyed clie
 |---|---|---|---|
 | `AzureOpenAI:Endpoint` | Foundry resource endpoint. **Must end in `/openai/v1/`**. | _(blank)_ | Yes |
 | `AzureOpenAI:ApiKey` | API key of the resource. | _(blank)_ | Yes |
-| `AzureOpenAI:Model` | Responses API deployment name that drives the agent. | `rrp-gpt-5.6-luna` | Yes |
+| `AzureOpenAI:Model` | Responses API deployment name that drives the agent. | `rr-gpt-5.6-luna` | Yes |
 
 Stored output stays disabled on every call (`store:false`), so Cosmos DB remains the only place conversation state lives. Key Vault secret name: `AzureOpenAI--ApiKey`. See [Hosting and protocols](../agent/hosting-and-protocols.md#agent-pipeline) for how this client is built and wrapped.
+
+`AzureOpenAI:Model` is also checked at startup against the agent catalog in SQL Server — see the note below.
+
+## The agent catalog is not configuration
+
+Which model each agent runs, and its price, live in SQL Server (`[Core.Ref]`), not in `appsettings.json`: there is no configuration section for it, and the application never writes it. `AzureOpenAI:Model` above must name the same deployment as the weather agent's active model in the catalog — `Api/Startup/AgentCatalogBootstrapper.cs` checks the two at startup and refuses to run on a mismatch (see [Architecture overview](../architecture/overview.md#the-agent-catalog-and-session-usage-summaries)). Changing a price is a database change made directly against `[Core.Ref]`; moving an agent to a different model is that database change plus a new `AzureOpenAI:Model` and a restart — see the [runbook](runbook.md#changing-the-agent-catalog).
 
 ### `MicrosoftFoundry` — optional
 

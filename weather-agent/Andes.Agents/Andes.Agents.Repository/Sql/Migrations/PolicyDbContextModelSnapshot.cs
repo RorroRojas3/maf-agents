@@ -22,6 +22,146 @@ namespace Andes.Agents.Repository.Sql.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("Andes.Agents.Entity.Agents.Agent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("DateCreated")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("DateModified")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("Agent", "Core.Ref");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("34f1c4ff-6232-4001-8c45-3cfa859144e9"),
+                            DateCreated = new DateTimeOffset(new DateTime(2026, 9, 11, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DateModified = new DateTimeOffset(new DateTime(2026, 9, 11, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Name = "weather-agent",
+                            RowVersion = new byte[0]
+                        });
+                });
+
+            modelBuilder.Entity("Andes.Agents.Entity.Agents.AgentModelMapping", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("AgentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("DateCreated")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("DateDeactivated")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("DateModified")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("ModelId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AgentId")
+                        .IsUnique()
+                        .HasFilter("[DateDeactivated] IS NULL");
+
+                    b.HasIndex("ModelId");
+
+                    b.HasIndex("AgentId", "DateCreated");
+
+                    b.ToTable("AgentModelMapping", "Core.Ref", t =>
+                        {
+                            t.HasCheckConstraint("CK_AgentModelMapping_ActivationWindow", "[DateDeactivated] IS NULL OR [DateDeactivated] >= [DateCreated]");
+                        });
+                });
+
+            modelBuilder.Entity("Andes.Agents.Entity.Agents.Model", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("CachedInputPricePerMillionTokens")
+                        .HasPrecision(19, 9)
+                        .HasColumnType("decimal(19,9)");
+
+                    b.Property<DateTimeOffset>("DateCreated")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("DateModified")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("DeploymentName")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<decimal>("InputPricePerMillionTokens")
+                        .HasPrecision(19, 9)
+                        .HasColumnType("decimal(19,9)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<decimal>("OutputPricePerMillionTokens")
+                        .HasPrecision(19, 9)
+                        .HasColumnType("decimal(19,9)");
+
+                    b.Property<string>("ProviderName")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeploymentName")
+                        .IsUnique();
+
+                    b.ToTable("Model", "Core.Ref", t =>
+                        {
+                            t.HasCheckConstraint("CK_Model_Prices", "[InputPricePerMillionTokens] >= 0 AND [CachedInputPricePerMillionTokens] >= 0 AND [OutputPricePerMillionTokens] >= 0");
+                        });
+                });
+
             modelBuilder.Entity("Andes.Agents.Entity.Policies.Policy", b =>
                 {
                     b.Property<Guid>("Id")
@@ -35,14 +175,12 @@ namespace Andes.Agents.Repository.Sql.Migrations
                     b.Property<string>("CurrencyCode")
                         .IsRequired()
                         .HasMaxLength(3)
-                        .IsUnicode(false)
-                        .HasColumnType("char(3)")
-                        .IsFixedLength();
+                        .HasColumnType("nvarchar(3)");
 
                     b.Property<DateTimeOffset>("DateCreated")
                         .HasColumnType("datetimeoffset");
 
-                    b.Property<DateTimeOffset>("DateUpdated")
+                    b.Property<DateTimeOffset>("DateModified")
                         .HasColumnType("datetimeoffset");
 
                     b.Property<DateOnly>("EffectiveDate")
@@ -59,14 +197,12 @@ namespace Andes.Agents.Repository.Sql.Migrations
                     b.Property<string>("HolderReference")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(64)");
+                        .HasColumnType("nvarchar(64)");
 
                     b.Property<string>("PolicyNumber")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(32)");
+                        .HasColumnType("nvarchar(32)");
 
                     b.Property<decimal>("PremiumAmount")
                         .HasPrecision(19, 4)
@@ -75,8 +211,7 @@ namespace Andes.Agents.Repository.Sql.Migrations
                     b.Property<string>("ProductCode")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(20)");
+                        .HasColumnType("nvarchar(20)");
 
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
@@ -87,8 +222,7 @@ namespace Andes.Agents.Repository.Sql.Migrations
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(16)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(16)");
+                        .HasColumnType("nvarchar(16)");
 
                     b.HasKey("Id");
 
@@ -107,12 +241,116 @@ namespace Andes.Agents.Repository.Sql.Migrations
 
                             t.HasCheckConstraint("CK_Policy_CoverageWindow", "[ExpirationDate] > [EffectiveDate]");
 
-                            t.HasCheckConstraint("CK_Policy_CurrencyCode", "[CurrencyCode] COLLATE Latin1_General_100_BIN2 LIKE '[A-Z][A-Z][A-Z]'");
+                            t.HasCheckConstraint("CK_Policy_CurrencyCode", "[CurrencyCode] COLLATE Latin1_General_100_BIN2 LIKE N'[A-Z][A-Z][A-Z]'");
 
                             t.HasCheckConstraint("CK_Policy_PremiumAmount", "[PremiumAmount] >= 0");
 
-                            t.HasCheckConstraint("CK_Policy_Status", "[Status] COLLATE Latin1_General_100_BIN2 IN ('Draft', 'Active', 'Lapsed', 'Cancelled', 'Expired')");
+                            t.HasCheckConstraint("CK_Policy_Status", "[Status] COLLATE Latin1_General_100_BIN2 IN (N'Draft', N'Active', N'Lapsed', N'Cancelled', N'Expired')");
                         });
+                });
+
+            modelBuilder.Entity("Andes.Agents.Entity.Sessions.SessionSummary", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("AgentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long>("CachedInputTokens")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("DateCreated")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("DateDeleted")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("DateModified")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<decimal>("EstimatedCost")
+                        .HasPrecision(19, 9)
+                        .HasColumnType("decimal(19,9)");
+
+                    b.Property<long>("InputTokens")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("MessageCount")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("ModelId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long>("OutputTokens")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("ReasoningTokens")
+                        .HasColumnType("bigint");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long>("TotalTokens")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AgentId");
+
+                    b.HasIndex("DateCreated");
+
+                    b.HasIndex("ModelId");
+
+                    b.HasIndex("UserId", "SessionId", "DateCreated")
+                        .IsUnique();
+
+                    b.ToTable("Session", "Core", t =>
+                        {
+                            t.HasCheckConstraint("CK_Session_Counts", "[MessageCount] >= 0 AND [InputTokens] >= 0 AND [CachedInputTokens] >= 0 AND [OutputTokens] >= 0 AND [ReasoningTokens] >= 0 AND [TotalTokens] >= 0");
+
+                            t.HasCheckConstraint("CK_Session_EstimatedCost", "[EstimatedCost] >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("Andes.Agents.Entity.Agents.AgentModelMapping", b =>
+                {
+                    b.HasOne("Andes.Agents.Entity.Agents.Agent", null)
+                        .WithMany()
+                        .HasForeignKey("AgentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Andes.Agents.Entity.Agents.Model", null)
+                        .WithMany()
+                        .HasForeignKey("ModelId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Andes.Agents.Entity.Sessions.SessionSummary", b =>
+                {
+                    b.HasOne("Andes.Agents.Entity.Agents.Agent", null)
+                        .WithMany()
+                        .HasForeignKey("AgentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Andes.Agents.Entity.Agents.Model", null)
+                        .WithMany()
+                        .HasForeignKey("ModelId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

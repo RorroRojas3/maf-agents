@@ -3,7 +3,7 @@ using Microsoft.Data.SqlClient;
 
 namespace Andes.Agents.Repository.Sql.Options;
 
-/// <summary>Connection and resiliency settings for the SQL Server database that stores policies.</summary>
+/// <summary>Connection and resiliency settings for the application's SQL Server database.</summary>
 public sealed class SqlDbOptions
 {
     /// <summary>Configuration section these options bind from.</summary>

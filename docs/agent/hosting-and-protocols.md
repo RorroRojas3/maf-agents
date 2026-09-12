@@ -15,6 +15,8 @@ Registered by `.AddA2AServer()` on the hosted-agent builder and mapped in `Agent
 
 A2A's conversation identifier is `contextId`. A client either supplies one to continue a conversation, or omits it to start one — the host assigns a new id, which becomes the Cosmos DB `sessionId` the first time the turn is saved (see [Sessions and history](../conversations/sessions-and-history.md#session-id-validation) for what makes an id valid).
 
+An id that isn't a GUID needs different handling here than on the other two surfaces: the A2A server turns any exception it doesn't recognize into a 500 (HTTP+JSON) or an internal JSON-RPC error, which would hide what's actually a caller mistake behind a generic server failure. `AgentsConfiguration` wraps the session store the agent is registered with in a private `A2AErrorTranslatingSessionStore` that catches `InvalidSessionIdException` and rethrows it as `A2AException(A2AErrorCode.InvalidParams)`, which the A2A server turns into **HTTP 400** on HTTP+JSON or **JSON-RPC error `-32602`** on JSON-RPC. AG-UI shares that wrapped store, so `GlobalExceptionHandler` maps the same `A2AException` shape to the ordinary `400` `validation-error` problem — the response `api/conversations` gives for an invalid id, through its own `InvalidSessionIdException` arm.
+
 ### Agent card
 
 `GET /.well-known/agent-card.json` is **anonymous** — a client needs to discover how to authenticate before it can obtain a token — and is built once at startup by `WeatherAgentCard.Create`. It declares:
@@ -50,7 +52,7 @@ OpenTelemetryAgent            opens the invoke_agent span            Api/Configu
 
 **The agent** (`ChatClientAgent`) is configured with `UseProvidedChatClientAsIs = true` — the keyed client already carries function invocation and OpenTelemetry, so the agent doesn't wrap them a second time. Its `ChatHistoryProvider` is `PersistedChatHistoryProvider`, and its `ChatOptions.Tools` come from `WeatherToolProvider.CreateTools()`.
 
-**The wrappers** around `ChatClientAgent` add cross-cutting behavior without touching the agent itself: `OpenTelemetryAgent` opens the `invoke_agent` span, and `UsageRecordingAgent` (a `DelegatingAIAgent`) reads each response's token usage — from `AgentResponse.Usage` on a non-streaming run, or accumulated from `UsageContent` on a streaming one — and folds it into the session's `SessionUsage` running total, logging the same figures structurally. It runs in a `finally` block on the streaming path, so a turn the client abandoned mid-stream is still recorded and billed for.
+**The wrappers** around `ChatClientAgent` add cross-cutting behavior without touching the agent itself: `OpenTelemetryAgent` opens the `invoke_agent` span, and `UsageRecordingAgent` (a `DelegatingAIAgent`) reads each response's token usage — from `AgentResponse.Usage` on a non-streaming run, or accumulated from `UsageContent` on a streaming one — and folds it into the session's `SessionUsage` running total, plus a second state-bag key, `andes.usage.details`, for cached input and reasoning tokens (kept separate so an older build that only knows `SessionUsage` carries it through unchanged). Both feed the SQL Server usage summary described in [Sessions and history](../conversations/sessions-and-history.md#session-usage-reporting). `UsageRecordingAgent` logs the same figures structurally and runs in a `finally` block on the streaming path, so a turn the client abandoned mid-stream is still recorded and billed for — though whether that turn's session actually gets *saved*, and therefore reaches Cosmos DB and the SQL summary at all, is a separate question the same page's AG-UI caveat covers.
 
 ## Tools
 
@@ -78,7 +80,7 @@ When `Telemetry:ConnectionString` is set, both the agent layer and the chat-clie
 
 ```
 invoke_agent weather-agent
-  chat rrp-gpt-5.6-luna
+  chat rr-gpt-5.6-luna
     execute_tool search_location
     execute_tool get_current_weather
 ```

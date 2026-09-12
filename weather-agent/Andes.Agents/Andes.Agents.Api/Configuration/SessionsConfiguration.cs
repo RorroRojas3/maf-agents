@@ -23,6 +23,8 @@ internal static class SessionsConfiguration
         services.AddSingleton<PersistedChatHistoryProvider>();
         services.AddSingleton<PersistedAgentSessionStore>();
         services.AddSingleton<ISessionService, SessionService>();
+        services.AddSingleton<ISessionSummaryChannel, SessionSummaryChannel>();
+        services.AddHostedService<SessionSummaryProcessor>();
 
         return services;
     }
