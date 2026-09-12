@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "skills": {
+    "channels-setup": {
+      "source": "CopilotKit/CopilotKit",
+      "sourceType": "github",
+      "skillPath": "skills/channels-setup/SKILL.md",
+      "computedHash": "8c3d3efd131fbea6d7b5934f8b0bd04ae357694ecd3fd38ccfdd1633f649c227"
+    },
+    "copilotkit": {
+      "source": "CopilotKit/CopilotKit",
+      "sourceType": "github",
+      "skillPath": "skills/copilotkit/SKILL.md",
+      "computedHash": "75e278d1862d2957a2b085d8547f8cf6a4064c159ecdb931a1e264890ccdba3c"
+    },
+    "copilotkit-channels": {
+      "source": "CopilotKit/CopilotKit",
+      "sourceType": "github",
+      "skillPath": "skills/copilotkit-channels/SKILL.md",
+      "computedHash": "95aaaab88b9580b8a4eeb4cc84f480b464d7e26b83766c63612f0905946a71e2"
+    },
+    "copilotkit-cli": {
+      "source": "CopilotKit/CopilotKit",
+      "sourceType": "github",
+      "skillPath": "skills/copilotkit-cli/SKILL.md",
+      "computedHash": "eafbc3a21991ca3ed90c1b4c449499995805231acdc2f36796995f953203bb11"
+    },
+    "inspector-docs": {
+      "source": "CopilotKit/CopilotKit",
+      "sourceType": "github",
+      "skillPath": "skills/inspector-docs/SKILL.md",
+      "computedHash": "f55ef4312510d16bf87f845bd01e93cd9d65f8255e667331577728aabcb1f4eb"
+    },
+    "inspector-workbench": {
+      "source": "CopilotKit/CopilotKit",
+      "sourceType": "github",
+      "skillPath": "skills/inspector-workbench/SKILL.md",
+      "computedHash": "6b7de60855b52bd9e20a435204171021b80e7bf1832b1b981b84f2a6f8a3e36c"
+    },
+    "intelligence-docs": {
+      "source": "CopilotKit/CopilotKit",
+      "sourceType": "github",
+      "skillPath": "skills/intelligence-docs/SKILL.md",
+      "computedHash": "0c5884729e8170bebc59d3b75c33b4e5c2a8188d628f77b79339870058b9f1e9"
+    },
+    "setup-slack-channel": {
+      "source": "CopilotKit/CopilotKit",
+      "sourceType": "github",
+      "skillPath": "skills/setup-slack-channel/SKILL.md",
+      "computedHash": "aad78faffeaa2814128b6d6efdc6db3427a740382702b75dfa5c8dfbe3b71e64"
+    }
+  }
+}
