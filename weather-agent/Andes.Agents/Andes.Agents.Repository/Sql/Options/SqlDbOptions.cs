@@ -3,13 +3,16 @@ using Microsoft.Data.SqlClient;
 
 namespace Andes.Agents.Repository.Sql.Options;
 
-/// <summary>Connection and resiliency settings for the SQL Server database that stores policies.</summary>
+/// <summary>Connection and resiliency settings for the application's SQL Server database.</summary>
 public sealed class SqlDbOptions
 {
     /// <summary>Configuration section these options bind from.</summary>
     public const string SectionName = "SqlDb";
 
-    /// <summary>Gets or sets the connection string; its <c>Authentication</c> keyword chooses SQL or Microsoft Entra ID sign-in.</summary>
+    /// <summary>Name under <c>ConnectionStrings</c> that holds the database's connection string.</summary>
+    public const string ConnectionStringName = "DefaultConnection";
+
+    /// <summary>Gets or sets the connection string, read from <c>ConnectionStrings:DefaultConnection</c> rather than this section; its <c>Authentication</c> keyword chooses SQL or Microsoft Entra ID sign-in.</summary>
     public string ConnectionString { get; set; } = string.Empty;
 
     /// <summary>Gets or sets how long a command may run before it is abandoned, in seconds.</summary>
@@ -31,10 +34,8 @@ internal sealed class SqlDbOptionsValidator : AbstractValidator<SqlDbOptions>
     {
         // No message quotes the value: a connection string can carry a password.
         RuleFor(options => options.ConnectionString)
-            .Cascade(CascadeMode.Stop)
-            .NotEmpty()
             .Must(NamesDatabase)
-            .WithMessage($"'{SqlDbOptions.SectionName}:{nameof(SqlDbOptions.ConnectionString)}' must be a valid SQL Server connection string that names a database.");
+            .WithMessage($"'ConnectionStrings:{SqlDbOptions.ConnectionStringName}' must be a valid SQL Server connection string that names a database.");
 
         RuleFor(options => options.CommandTimeoutSeconds).InclusiveBetween(1, 600);
         RuleFor(options => options.MaxRetryCount).InclusiveBetween(0, 10);

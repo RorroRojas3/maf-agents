@@ -1,3 +1,4 @@
+using A2A;
 using Andes.Agents.Api.Observability;
 using Andes.Agents.Api.Problems;
 using Andes.Agents.Service.Exceptions;
@@ -52,12 +53,17 @@ internal sealed partial class GlobalExceptionHandler(ILogger<GlobalExceptionHand
         return true;
     }
 
+    #region Private Methods
+
     private static ProblemDescription Describe(Exception exception) => exception switch
     {
         // The failures go in the body, never in the log line: they quote what the caller sent.
         ValidationException validation =>
             new(StatusCodes.Status400BadRequest, "The request is not valid", ProblemTypes.ValidationError, "One or more parameters are not valid.", ToErrors(validation)),
         InvalidSessionIdException =>
+            new(StatusCodes.Status400BadRequest, "The request is not valid", ProblemTypes.ValidationError, exception.Message),
+        // The session store raises the A2A form so the A2A server can answer it; AG-UI brings it here.
+        A2AException { ErrorCode: A2AErrorCode.InvalidParams } =>
             new(StatusCodes.Status400BadRequest, "The request is not valid", ProblemTypes.ValidationError, exception.Message),
         ForbiddenException =>
             new(StatusCodes.Status403Forbidden, "Forbidden", ProblemTypes.Forbidden, exception.Message),
@@ -71,6 +77,15 @@ internal sealed partial class GlobalExceptionHandler(ILogger<GlobalExceptionHand
         _ => new(StatusCodes.Status500InternalServerError, "An unexpected error occurred", Type: null, Detail: null),
     };
 
+    private static Dictionary<string, string[]> ToErrors(ValidationException exception) =>
+        exception.Errors
+            .GroupBy(failure => failure.PropertyName, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Select(failure => failure.ErrorMessage).ToArray(), StringComparer.Ordinal);
+
+    #endregion
+
+    #region Loggers
+
     [LoggerMessage(Level = LogLevel.Error, Message = "Unhandled exception for {Method} {Route}.")]
     private partial void LogUnexpected(Exception exception, string method, string route);
 
@@ -80,10 +95,7 @@ internal sealed partial class GlobalExceptionHandler(ILogger<GlobalExceptionHand
     [LoggerMessage(Level = LogLevel.Debug, Message = "{Method} {Route} was abandoned by the caller.")]
     private partial void LogAbandoned(string method, string route);
 
-    private static Dictionary<string, string[]> ToErrors(ValidationException exception) =>
-        exception.Errors
-            .GroupBy(failure => failure.PropertyName, StringComparer.Ordinal)
-            .ToDictionary(group => group.Key, group => group.Select(failure => failure.ErrorMessage).ToArray(), StringComparer.Ordinal);
+    #endregion
 
     private sealed record ProblemDescription(
         int Status,

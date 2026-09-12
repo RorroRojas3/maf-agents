@@ -7,7 +7,7 @@ namespace Andes.Agents.Dto.Sessions;
 /// <param name="MessageCount">Number of messages stored for the session.</param>
 /// <param name="Usage">Cumulative token usage.</param>
 /// <param name="DateCreated">UTC time the session was created.</param>
-/// <param name="DateUpdated">UTC time of the last save.</param>
+/// <param name="DateModified">UTC time of the last save.</param>
 /// <param name="LastMessageAt">UTC time of the last stored message.</param>
 public sealed record SessionDto(
     string Id,
@@ -16,5 +16,5 @@ public sealed record SessionDto(
     int MessageCount,
     SessionUsageDto Usage,
     DateTimeOffset DateCreated,
-    DateTimeOffset DateUpdated,
+    DateTimeOffset DateModified,
     DateTimeOffset? LastMessageAt);

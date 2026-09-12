@@ -60,6 +60,7 @@ Default to a record; reach for a class when the type has behaviour or identity, 
 - Ensure that the final return statement of a method is on its own line.
 - Use pattern matching and switch expressions wherever possible.
 - Use `nameof` instead of string literals when referring to member names.
+- **Member order in a service or implementation** — a non-static class that implements an interface or overrides a base type: fields, constructors and properties; the methods that implement the interface or override the base; any other public instance methods; then `#region Public Static Methods`, `#region Private Methods` (instance and static) and `#region Loggers` (`[LoggerMessage]` partials), in that order and only when the region has members; nested types last. Each group keeps its members' relative order.
 - Give public APIs a one-sentence `<summary>`; implementations use `/// <inheritdoc />`. Add `<param>`, `<returns>`, `<remarks>`, or `<example>` only where they carry what the signature does not.
 - `<remarks>` is a caveat a caller must know, two sentences at most — not rationale, history, or alternatives weighed. `internal` and test types are not API surface: document them only where a *why* exists.
 - Where this conflicts with the `csharp-docs` skill, this wins: the skill describes .NET's framework-reference house style, not this codebase's.
@@ -78,7 +79,7 @@ Default to a record; reach for a class when the type has behaviour or identity, 
 
 ## Validation
 
-- Validate with **FluentValidation**. Never `System.ComponentModel.DataAnnotations` — no `[Required]`, `[Range]`, `[Url]`, no `ValidateDataAnnotations()`.
+- Validate with **FluentValidation**. Never `System.ComponentModel.DataAnnotations` — no `[Required]`, `[Range]`, `[Url]`, no `ValidateDataAnnotations()`. EF Core mapping attributes on an entity (`[Table]`, `[Key]`, `[DatabaseGenerated]`, `[Timestamp]`, `[Keyless]`, `[StringLength]`, `[Precision]`) are model metadata, not validation — see Data Access.
 - One `AbstractValidator<T>` per validated type, in the same file as the type it validates.
 - Options are validated the same way: `AddOptions<T>().Bind(...).ValidateWithFluentValidation().ValidateOnStart()`, with the matching `IValidator<T>` registered alongside. Put a cross-field rule in the validator, not in a `.Validate(lambda, message)` call on the builder.
 - Chain `.Cascade(CascadeMode.Stop)` before a rule whose predicate would throw on the value the previous rule rejects.
@@ -88,6 +89,8 @@ Default to a record; reach for a class when the type has behaviour or identity, 
 - Use Entity Framework Core where a relational store and change tracking earn it; a document or key-value store reached through its own SDK is equally valid, and `ef-core` guidance then does not apply.
 - Apply the repository pattern where it adds value.
 - With EF Core, manage schema with migrations; seed data where needed.
+- **EF Core mapping is hybrid.** The entity declares its column shape with attributes: `[Table("<Entity>", Schema = "<Schema>")]`, `[Key]`, `[DatabaseGenerated]`, `[Timestamp]`, `[Keyless]`, `[StringLength]`, `[Precision]`. A string is always `nvarchar`: `[StringLength]`, never `[MaxLength]`, `[Unicode(false)]` or a fixed length. Its `IEntityTypeConfiguration<T>` holds the rest: relationships, indexes, check constraints, value conversions (with a converted enum's length, since `[StringLength]` on a non-string throws under DataAnnotations validation) and seed data. Column lengths and precision live in those attributes, never in a constants class.
+- **LINQ is method syntax only** — `.Where(...).Join(...).Select(...)`, never query syntax (`from … in … select`), whether against EF Core or in memory.
 - Write efficient queries — avoid N+1 and over-fetching.
 
 ## Logging and Monitoring

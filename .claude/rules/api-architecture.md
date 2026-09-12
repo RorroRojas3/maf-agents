@@ -26,7 +26,7 @@ Placeholders: `<Root>` = solution prefix (`Contoso.Shop`); `<Feature>` = plural 
 - **Grouped model files per leaf folder** `<Folder>/`: non-service classes → `<Folder>Classes.cs`; records → `<Folder>Records.cs`; structs and record structs → `<Folder>Structs.cs`; const-only static holders → `<Folder>Constants.cs`; exceptions → `<Folder>Exceptions.cs`. A static class with method bodies keeps its own file. Nested and private types stay nested. Enums never live here.
 - **Interfaces.** One implementation → same file as the implementation, file named after the implementation, interface declared first. Two or more implementations, or implementations that live in a subfolder → `<Feature>/Interfaces/I<Name>.cs`, one per file. A nested namespace sees its parent, so an interface in `<Feature>/Interfaces/` needs no `using` for types in `<Feature>/` — adding one is an unnecessary-using error.
 - **Options.** `<Area>Options` classes, each with `public const string SectionName`. **Every project that reads options owns an `Options/` folder**, and the class lives in the lowest project that reads it — `Api/Options/` for host concerns, `Service/Options/` for business knobs, `Repository/<Provider>/Options/` for store settings. A project with provider folders puts each provider's options inside that provider's own `Options/`, never in a shared one, so a second store carries its configuration with it. Bind with `AddOptions<T>().Bind(configuration.GetSection(T.SectionName)).ValidateWithFluentValidation().ValidateOnStart()`. Never `Configure<T>`, never `*Settings`. Inside any namespace that contains an `Options` segment the folder shadows Microsoft's `Options` class: write `Microsoft.Extensions.Options.Options.Create(...)`.
-- **Validation is FluentValidation**, never DataAnnotations. One `AbstractValidator<T>` per validated type, declared **in the same file as the type it validates** — the one sanctioned exception to file-name-equals-type-name, alongside the interface rule. A validator is `internal` unless another project registers it. Cross-field rules go in the validator, not in a `.Validate(lambda, message)` call on the options builder.
+- **Validation is FluentValidation**, never DataAnnotations — EF Core mapping attributes on an entity are model metadata, not validation (see `<Root>.Entity`). One `AbstractValidator<T>` per validated type, declared **in the same file as the type it validates** — the one sanctioned exception to file-name-equals-type-name, alongside the interface rule. A validator is `internal` unless another project registers it. Cross-field rules go in the validator, not in a `.Validate(lambda, message)` call on the options builder.
 - **Enums** all live in `Common/Enums/`, one per file, named in the plural (`OrderStatuses`, not `OrderStatus`) so they never collide with an entity. A wire-name companion is `<Enum>Names` in the owning Service feature.
 - **Constants** (string and Guid catalogs, const-only) all live in `Common/Constants/`. Dto, Entity, Service and Api hold no enums and no catalogs. A validation limit both a DTO validator and a store configuration must agree on is a catalog in `Common/Constants/`, not a constant on either.
 - **Exceptions.** Every project that throws owns an `Exceptions/` folder or a `<Folder>Exceptions.cs` in the feature that throws. Only `NotFoundException` and `ForbiddenException` are solution-wide (`Service/Exceptions/`). **A provider exception never reaches Api untranslated**: `Repository/<Provider>/` throws a store-shaped exception, and the Service feature catches it and rethrows the domain exception the handler maps. Api's exception handler therefore names no Repository type, and swapping the store changes nothing above Service.
@@ -108,7 +108,7 @@ Provider-first: store-agnostic contracts sit at the top, and everything one tech
    ├─ Options/<Provider>DbOptions.cs          + its validator, in the same file
    ├─ Provisioning/                 <Provider>ResourceProvisioner.cs, <Provider>SchemaMigrator.cs — create or migrate the store when an Api/Startup bootstrapper asks
    ├─ Serialization/                converters and serializer settings this store needs
-   ├─ DbContexts/  Configurations/  Migrations/   EF providers only: <RootShort>DbContext.cs, IEntityTypeConfiguration<T> mirroring the Entity folders, `dotnet ef migrations add` output
+   ├─ DbContexts/  Configurations/  Migrations/   EF providers only: <RootShort>DbContext.cs, IEntityTypeConfiguration<T> mirroring the Entity folders (relationships, indexes, constraints, conversions, seed data), `dotnet ef migrations add` output
    ├─ Interceptors/                 EF providers only: <Name>Interceptor.cs, one per file — save-changes, command and connection interceptors
    └─ <Feature>/<Provider><Entity>Repository.cs   the implementation, named for the store it talks to
 ```
@@ -122,6 +122,8 @@ The provider folder owns its own DI, so the composition root sequences one call 
 ├─ Base/                            BaseEntity.cs and the abstract Base<Thing>.cs shared by aggregates
 └─ <Feature>/                       one file per entity: <Entity>.cs, <Entity><Child>.cs; <Feature>Records/Constants.cs for non-relational documents
 ```
+
+An entity declares its own column shape with attributes — `[Table("<Entity>", Schema = "<Schema>")]`, `[Key]`, `[DatabaseGenerated]`, `[Timestamp]`, `[Keyless]`, `[StringLength]`, `[Precision]` — so `Entity` takes `Microsoft.EntityFrameworkCore.Abstractions` and nothing else from EF Core. A string is always `nvarchar`: `[StringLength]`, never `[MaxLength]`, `[Unicode(false)]` or a fixed length. Relationships, indexes, check constraints, value conversions and seed data stay in `Repository/<Provider>/Configurations/`.
 
 ### `<Root>.Dto`
 
@@ -251,7 +253,8 @@ tests/<Root>.Integration.Test/
 - No loose `.cs` at a project root; no `Models/`, `Helpers/`, `Utils/`, `Tool/`, `Settings/` or `Mappers/` folders in Service; no `Exceptions/` folder in Service beyond the two shared types.
 - No controllers, no `MapControllers()`, no AutoMapper, no `Abstractions` project, no `*Settings` classes, no `Configure<T>`.
 - **No `Swashbuckle.AspNetCore`, `AddSwaggerGen`, `UseSwagger` or `UseSwaggerUI`** — the document comes from `Microsoft.AspNetCore.OpenApi` and the UI from Scalar.
-- **No `System.ComponentModel.DataAnnotations` validation** — no `[Required]`, `[Range]`, `[Url]`, no `ValidateDataAnnotations()`.
+- **No `System.ComponentModel.DataAnnotations` validation** — no `[Required]`, `[Range]`, `[Url]`, no `ValidateDataAnnotations()`. Mapping attributes on an entity are not validation.
+- No constants class for column lengths or precision, and no model-owned (`HasData`) seed for rows operators change after release — write those as `InsertData` in the migration that creates the table.
 - No enums or constant catalogs in Dto, Entity, Service or Api — they live in Common.
 - No provider name on a type outside `Repository/<Provider>/`; no provider-specific code in Service or Api, including client construction in the composition root.
 - No shared `Options/` or `Serialization/` folder at the Repository root when provider folders exist — each provider owns its own.

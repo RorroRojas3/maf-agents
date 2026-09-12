@@ -105,6 +105,8 @@ public sealed class CosmosSessionMessageRepository(ICosmosContainers containers)
         }
     }
 
+    #region Private Methods
+
     private static async Task ExecuteAsync(TransactionalBatch batch, CancellationToken cancellationToken)
     {
         using TransactionalBatchResponse response = await batch.ExecuteAsync(cancellationToken).ConfigureAwait(false);
@@ -121,4 +123,6 @@ public sealed class CosmosSessionMessageRepository(ICosmosContainers containers)
 
         throw new InvalidOperationException($"The batch write failed with status {(int)response.StatusCode}: {response.ErrorMessage}");
     }
+
+    #endregion
 }

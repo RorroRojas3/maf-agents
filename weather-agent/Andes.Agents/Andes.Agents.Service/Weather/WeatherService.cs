@@ -167,6 +167,8 @@ public sealed class WeatherService(TimeProvider timeProvider) : IWeatherService
         return Task.FromResult(new DailyForecastResult(locationName, forecast));
     }
 
+    #region Private Methods
+
     private static DayReading DescribeDay(double latitude, double longitude, DateOnly date)
     {
         Random random = new(StableHash(FormattableString.Invariant($"{latitude:F2}|{longitude:F2}|{date:yyyy-MM-dd}")));
@@ -231,6 +233,8 @@ public sealed class WeatherService(TimeProvider timeProvider) : IWeatherService
 
         return unchecked((int)hash);
     }
+
+    #endregion
 
     private sealed record DayReading(
         double MeanC,

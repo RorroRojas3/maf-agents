@@ -22,7 +22,7 @@ public sealed class ConversationBusyException : Exception
     }
 }
 
-/// <summary>A continuation id from the wire cannot be used as a Cosmos DB id.</summary>
+/// <summary>A continuation id from the wire is not a GUID.</summary>
 public sealed class InvalidSessionIdException : Exception
 {
     /// <summary>Creates the exception with the default message.</summary>

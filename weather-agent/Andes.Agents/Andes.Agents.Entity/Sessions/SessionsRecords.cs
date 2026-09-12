@@ -12,7 +12,7 @@ namespace Andes.Agents.Entity.Sessions;
 /// <param name="MessageCount">Number of messages stored for the session.</param>
 /// <param name="Usage">Cumulative token usage across every turn.</param>
 /// <param name="DateCreated">UTC time the session was created.</param>
-/// <param name="DateUpdated">UTC time of the last save.</param>
+/// <param name="DateModified">UTC time of the last save.</param>
 /// <param name="LastMessageAt">UTC time of the last stored message.</param>
 /// <param name="State">The serialized agent session; opaque to this application.</param>
 public sealed record SessionDocument(
@@ -24,7 +24,7 @@ public sealed record SessionDocument(
     int MessageCount,
     SessionUsage Usage,
     DateTimeOffset DateCreated,
-    DateTimeOffset DateUpdated,
+    DateTimeOffset DateModified,
     DateTimeOffset? LastMessageAt,
     JsonElement State);
 
@@ -60,6 +60,17 @@ public sealed record SessionUsage(long InputTokens, long OutputTokens, long Tota
     /// <summary>Returns this usage plus one turn's counts.</summary>
     public SessionUsage Add(long inputTokens, long outputTokens, long totalTokens) =>
         new(InputTokens + inputTokens, OutputTokens + outputTokens, TotalTokens + totalTokens);
+}
+
+/// <summary>Cached input and reasoning tokens accumulated over a session; each is part of a <see cref="SessionUsage"/> count.</summary>
+public sealed record SessionUsageDetails(long CachedInputTokens, long ReasoningTokens)
+{
+    /// <summary>Details of a session that has not completed a turn.</summary>
+    public static SessionUsageDetails Empty { get; } = new(0, 0);
+
+    /// <summary>Returns these details plus one turn's counts.</summary>
+    public SessionUsageDetails Add(long cachedInputTokens, long reasoningTokens) =>
+        new(CachedInputTokens + cachedInputTokens, ReasoningTokens + reasoningTokens);
 }
 
 /// <summary>

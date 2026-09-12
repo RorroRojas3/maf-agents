@@ -49,6 +49,8 @@ internal sealed partial class RequestLoggingMiddleware(RequestDelegate next, ILo
         }
     }
 
+    #region Private Methods
+
     private static bool IsExcluded(PathString path, string[] excludedPaths)
     {
         foreach (string excluded in excludedPaths)
@@ -62,9 +64,15 @@ internal sealed partial class RequestLoggingMiddleware(RequestDelegate next, ILo
         return false;
     }
 
+    #endregion
+
+    #region Loggers
+
     [LoggerMessage(Level = LogLevel.Information, Message = "{Method} {Route} responded {StatusCode} in {ElapsedMilliseconds} ms.")]
     private partial void LogRequest(string method, string route, int statusCode, double elapsedMilliseconds);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "{Method} {Route} responded {StatusCode} in {ElapsedMilliseconds} ms, over the slow-request threshold.")]
     private partial void LogSlowRequest(string method, string route, int statusCode, double elapsedMilliseconds);
+
+    #endregion
 }

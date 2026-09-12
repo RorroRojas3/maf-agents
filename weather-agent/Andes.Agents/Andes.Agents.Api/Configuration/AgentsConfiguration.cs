@@ -1,7 +1,9 @@
+using A2A;
 using Andes.Agents.Api.Options;
 using Andes.Agents.Common.Constants;
 using Andes.Agents.Common.Validation;
 using Andes.Agents.Service.Agents;
+using Andes.Agents.Service.Caching;
 using Andes.Agents.Service.Prompts;
 using Andes.Agents.Service.Sessions;
 using Andes.Agents.Service.Weather.Tools;
@@ -25,12 +27,17 @@ internal static class AgentsConfiguration
             .ValidateWithFluentValidation()
             .ValidateOnStart();
 
+        services.AddMemoryCache();
+        services.AddSingleton<IAgentCatalogCache, AgentCatalogCache>();
+
         services.AddAGUIServer();
 
         services
             .AddAIAgent(AgentNames.Weather, CreateWeatherAgent)
             // The store scopes every lookup by the caller itself, so the framework's isolation wrapper is not layered on top.
-            .WithSessionStore((provider, _) => provider.GetRequiredService<PersistedAgentSessionStore>(), withIsolation: false)
+            .WithSessionStore(
+                (provider, _) => new A2AErrorTranslatingSessionStore(provider.GetRequiredService<PersistedAgentSessionStore>()),
+                withIsolation: false)
             .AddA2AServer();
 
         return services;
@@ -65,5 +72,41 @@ internal static class AgentsConfiguration
             .UseOpenTelemetry(TelemetryNames.Source, otel => otel.EnableSensitiveData = telemetry.EnableSensitiveData)
             .Use(inner => new UsageRecordingAgent(inner, loggerFactory))
             .Build(provider);
+    }
+
+    // The A2A server answers an exception it does not recognize with 500 (HTTP+JSON) or an internal error (JSON-RPC), but an
+    // invalid-params error with 400 or -32602. AG-UI surfaces the same error through GlobalExceptionHandler as a 400.
+    private sealed class A2AErrorTranslatingSessionStore(AgentSessionStore innerStore) : DelegatingAgentSessionStore(innerStore)
+    {
+        public override async ValueTask<AgentSession> GetSessionAsync(AIAgent agent, string sessionStoreId, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                return await base.GetSessionAsync(agent, sessionStoreId, cancellationToken);
+            }
+            catch (InvalidSessionIdException exception)
+            {
+                throw ToInvalidParams(exception);
+            }
+        }
+
+        public override async ValueTask DeleteSessionAsync(AIAgent agent, string sessionStoreId, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                await base.DeleteSessionAsync(agent, sessionStoreId, cancellationToken);
+            }
+            catch (InvalidSessionIdException exception)
+            {
+                throw ToInvalidParams(exception);
+            }
+        }
+
+        #region Private Methods
+
+        private static A2AException ToInvalidParams(InvalidSessionIdException exception) =>
+            new(exception.Message, exception, A2AErrorCode.InvalidParams);
+
+        #endregion
     }
 }

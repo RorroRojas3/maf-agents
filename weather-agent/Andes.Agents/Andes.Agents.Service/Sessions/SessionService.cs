@@ -31,10 +31,12 @@ public interface ISessionService
 public sealed class SessionService(
     ISessionRepository sessions,
     ISessionMessageRepository messages,
+    ISessionSummaryChannel summaries,
     ICallerContext caller) : ISessionService
 {
     private readonly ISessionRepository _sessions = sessions;
     private readonly ISessionMessageRepository _messages = messages;
+    private readonly ISessionSummaryChannel _summaries = summaries;
     private readonly ICallerContext _caller = caller;
 
     /// <inheritdoc />
@@ -81,7 +83,11 @@ public sealed class SessionService(
 
         await _messages.DeleteAllAsync(document.UserId, document.SessionId, cancellationToken).ConfigureAwait(false);
         await _sessions.DeleteAsync(document.UserId, document.SessionId, cancellationToken).ConfigureAwait(false);
+
+        _summaries.EnqueueDeletion(document);
     }
+
+    #region Private Methods
 
     private async Task<SessionRead> RequireAsync(string sessionId, CancellationToken cancellationToken)
     {
@@ -90,4 +96,6 @@ public sealed class SessionService(
         return await _sessions.GetAsync(_caller.UserId, sessionId, cancellationToken).ConfigureAwait(false)
             ?? throw new NotFoundException($"Conversation '{sessionId}' was not found.");
     }
+
+    #endregion
 }

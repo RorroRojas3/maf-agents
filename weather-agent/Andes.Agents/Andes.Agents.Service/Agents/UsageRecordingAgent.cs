@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Andes.Agents.Service.Agents;
 
-/// <summary>Adds each turn's token usage to the session's running total and logs it.</summary>
+/// <summary>Adds each turn's token usage to the session's running totals and logs it.</summary>
 public sealed partial class UsageRecordingAgent(AIAgent innerAgent, ILoggerFactory loggerFactory) : DelegatingAIAgent(innerAgent)
 {
     private readonly ILogger<UsageRecordingAgent> _logger = loggerFactory.CreateLogger<UsageRecordingAgent>();
@@ -56,6 +56,8 @@ public sealed partial class UsageRecordingAgent(AIAgent innerAgent, ILoggerFacto
         }
     }
 
+    #region Private Methods
+
     private void Record(AgentSession? session, UsageDetails? usage)
     {
         if (usage is null)
@@ -76,8 +78,20 @@ public sealed partial class UsageRecordingAgent(AIAgent innerAgent, ILoggerFacto
 
         SessionUsage current = session.StateBag.GetValue<SessionUsage>(SessionStateKeys.Usage, SessionStateJson.Options) ?? SessionUsage.Empty;
         session.StateBag.SetValue(SessionStateKeys.Usage, current.Add(input, output, total), SessionStateJson.Options);
+
+        SessionUsageDetails details = session.StateBag.GetValue<SessionUsageDetails>(SessionStateKeys.UsageDetails, SessionStateJson.Options) ?? SessionUsageDetails.Empty;
+        session.StateBag.SetValue(
+            SessionStateKeys.UsageDetails,
+            details.Add(usage.CachedInputTokenCount ?? 0, usage.ReasoningTokenCount ?? 0),
+            SessionStateJson.Options);
     }
+
+    #endregion
+
+    #region Loggers
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Agent {AgentName} used {InputTokens} input and {OutputTokens} output tokens ({TotalTokens} total).")]
     private partial void LogUsage(string agentName, long inputTokens, long outputTokens, long totalTokens);
+
+    #endregion
 }

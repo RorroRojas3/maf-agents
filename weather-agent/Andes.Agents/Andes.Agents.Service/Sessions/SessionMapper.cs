@@ -18,7 +18,7 @@ public static class SessionMapper
             document.MessageCount,
             MapToSessionUsageDto(document.Usage),
             document.DateCreated,
-            document.DateUpdated,
+            document.DateModified,
             document.LastMessageAt);
     }
 

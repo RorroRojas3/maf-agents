@@ -57,4 +57,5 @@ app.Services.GetRequiredService<IStartupValidator>().Validate();
 
 await app.EnsureCosmosResourcesAsync();
 await app.MigrateSqlDatabaseAsync();
+await app.ValidateAgentCatalogAsync();
 await app.RunAsync();
