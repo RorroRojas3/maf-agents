@@ -26,6 +26,8 @@ internal sealed class AuditTimestampInterceptor(TimeProvider timeProvider) : Sav
         return ValueTask.FromResult(result);
     }
 
+    #region Private Methods
+
     private void Stamp(DbContext? context)
     {
         if (context is null)
@@ -68,4 +70,6 @@ internal sealed class AuditTimestampInterceptor(TimeProvider timeProvider) : Sav
 
     // Against the original value, not IsModified: a disconnected Update marks every property modified.
     private static bool HasChanged(PropertyEntry<BaseEntity, DateTimeOffset> property) => property.CurrentValue != property.OriginalValue;
+
+    #endregion
 }

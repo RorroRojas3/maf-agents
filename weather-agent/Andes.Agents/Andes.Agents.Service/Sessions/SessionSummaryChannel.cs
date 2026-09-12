@@ -88,6 +88,8 @@ public sealed partial class SessionSummaryChannel(TimeProvider timeProvider, ILo
     /// <inheritdoc />
     public void Complete() => _channel.Writer.TryComplete();
 
+    #region Private Methods
+
     private void Write(SessionSummaryWork work)
     {
         if (!_channel.Writer.TryWrite(work))
@@ -108,9 +110,15 @@ public sealed partial class SessionSummaryChannel(TimeProvider timeProvider, ILo
         return null;
     }
 
+    #endregion
+
+    #region Loggers
+
     [LoggerMessage(Level = LogLevel.Warning, Message = "A session summary was dropped: the summary channel is full or no longer accepts work.")]
     private partial void LogDropped();
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "A session summary was skipped: its user or session id is not a GUID.")]
     private partial void LogIdsNotGuids();
+
+    #endregion
 }

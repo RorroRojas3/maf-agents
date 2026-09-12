@@ -53,6 +53,8 @@ internal sealed partial class GlobalExceptionHandler(ILogger<GlobalExceptionHand
         return true;
     }
 
+    #region Private Methods
+
     private static ProblemDescription Describe(Exception exception) => exception switch
     {
         // The failures go in the body, never in the log line: they quote what the caller sent.
@@ -75,6 +77,15 @@ internal sealed partial class GlobalExceptionHandler(ILogger<GlobalExceptionHand
         _ => new(StatusCodes.Status500InternalServerError, "An unexpected error occurred", Type: null, Detail: null),
     };
 
+    private static Dictionary<string, string[]> ToErrors(ValidationException exception) =>
+        exception.Errors
+            .GroupBy(failure => failure.PropertyName, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Select(failure => failure.ErrorMessage).ToArray(), StringComparer.Ordinal);
+
+    #endregion
+
+    #region Loggers
+
     [LoggerMessage(Level = LogLevel.Error, Message = "Unhandled exception for {Method} {Route}.")]
     private partial void LogUnexpected(Exception exception, string method, string route);
 
@@ -84,10 +95,7 @@ internal sealed partial class GlobalExceptionHandler(ILogger<GlobalExceptionHand
     [LoggerMessage(Level = LogLevel.Debug, Message = "{Method} {Route} was abandoned by the caller.")]
     private partial void LogAbandoned(string method, string route);
 
-    private static Dictionary<string, string[]> ToErrors(ValidationException exception) =>
-        exception.Errors
-            .GroupBy(failure => failure.PropertyName, StringComparer.Ordinal)
-            .ToDictionary(group => group.Key, group => group.Select(failure => failure.ErrorMessage).ToArray(), StringComparer.Ordinal);
+    #endregion
 
     private sealed record ProblemDescription(
         int Status,

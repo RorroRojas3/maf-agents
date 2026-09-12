@@ -23,6 +23,8 @@ public sealed class PromptTemplateLoader : IPromptTemplateLoader
         return _templates.GetOrAdd(name, Read);
     }
 
+    #region Private Methods
+
     private static string Read(string name)
     {
         using Stream stream = typeof(PromptTemplateLoader).Assembly.GetManifestResourceStream(name)
@@ -31,4 +33,6 @@ public sealed class PromptTemplateLoader : IPromptTemplateLoader
 
         return reader.ReadToEnd().Trim();
     }
+
+    #endregion
 }

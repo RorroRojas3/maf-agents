@@ -30,6 +30,8 @@ public sealed class CosmosResourceProvisioner(CosmosClient client, CosmosContain
             .ConfigureAwait(false);
     }
 
+    #region Private Methods
+
     private static ContainerProperties Describe(string containerId, string excludedPath)
     {
         ContainerProperties properties = new(containerId, _partitionKeyPaths)
@@ -46,4 +48,6 @@ public sealed class CosmosResourceProvisioner(CosmosClient client, CosmosContain
 
         return properties;
     }
+
+    #endregion
 }

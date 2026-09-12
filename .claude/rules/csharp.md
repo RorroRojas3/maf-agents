@@ -60,6 +60,7 @@ Default to a record; reach for a class when the type has behaviour or identity, 
 - Ensure that the final return statement of a method is on its own line.
 - Use pattern matching and switch expressions wherever possible.
 - Use `nameof` instead of string literals when referring to member names.
+- **Member order in a service or implementation** — a non-static class that implements an interface or overrides a base type: fields, constructors and properties; the methods that implement the interface or override the base; any other public instance methods; then `#region Public Static Methods`, `#region Private Methods` (instance and static) and `#region Loggers` (`[LoggerMessage]` partials), in that order and only when the region has members; nested types last. Each group keeps its members' relative order.
 - Give public APIs a one-sentence `<summary>`; implementations use `/// <inheritdoc />`. Add `<param>`, `<returns>`, `<remarks>`, or `<example>` only where they carry what the signature does not.
 - `<remarks>` is a caveat a caller must know, two sentences at most — not rationale, history, or alternatives weighed. `internal` and test types are not API surface: document them only where a *why* exists.
 - Where this conflicts with the `csharp-docs` skill, this wins: the skill describes .NET's framework-reference house style, not this codebase's.

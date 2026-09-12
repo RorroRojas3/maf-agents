@@ -59,6 +59,8 @@ public sealed partial class SessionSummaryProcessor(
         }
     }
 
+    #region Private Methods
+
     private async Task WriteAsync(SessionSummaryWork work, CancellationToken stoppingToken)
     {
         TimeSpan retryDelay = _firstRetryDelay;
@@ -169,6 +171,10 @@ public sealed partial class SessionSummaryProcessor(
             ? exception.GetType().Name
             : $"{exception.GetType().Name} ({exception.InnerException.GetType().Name})";
 
+    #endregion
+
+    #region Loggers
+
     [LoggerMessage(Level = LogLevel.Warning, Message = "The agent catalog could not be read ({ExceptionType}); retrying in {RetryDelay}.")]
     private partial void LogCatalogUnavailable(string exceptionType, TimeSpan retryDelay);
 
@@ -186,4 +192,6 @@ public sealed partial class SessionSummaryProcessor(
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "A session summary for {AgentName} was dropped because the host is stopping.")]
     private partial void LogDroppedWhileStopping(string agentName);
+
+    #endregion
 }

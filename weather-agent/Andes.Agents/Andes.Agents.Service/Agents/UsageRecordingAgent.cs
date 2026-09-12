@@ -56,6 +56,8 @@ public sealed partial class UsageRecordingAgent(AIAgent innerAgent, ILoggerFacto
         }
     }
 
+    #region Private Methods
+
     private void Record(AgentSession? session, UsageDetails? usage)
     {
         if (usage is null)
@@ -84,6 +86,12 @@ public sealed partial class UsageRecordingAgent(AIAgent innerAgent, ILoggerFacto
             SessionStateJson.Options);
     }
 
+    #endregion
+
+    #region Loggers
+
     [LoggerMessage(Level = LogLevel.Information, Message = "Agent {AgentName} used {InputTokens} input and {OutputTokens} output tokens ({TotalTokens} total).")]
     private partial void LogUsage(string agentName, long inputTokens, long outputTokens, long totalTokens);
+
+    #endregion
 }

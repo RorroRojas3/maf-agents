@@ -34,23 +34,6 @@ public sealed class PersistedChatHistoryProvider(
     /// <inheritdoc />
     public override IReadOnlyList<string> StateKeys { get; } = [SessionStateKeys.History];
 
-    /// <summary>Reads the history state of a session; unbound when the store has not seen it.</summary>
-    public SessionHistoryState GetState(AgentSession session)
-    {
-        ArgumentNullException.ThrowIfNull(session);
-
-        return _state.GetOrInitializeState(session);
-    }
-
-    /// <summary>Binds a session to its owner and continuation id, or updates its running summary.</summary>
-    public void SetState(AgentSession session, SessionHistoryState state)
-    {
-        ArgumentNullException.ThrowIfNull(session);
-        ArgumentNullException.ThrowIfNull(state);
-
-        _state.SaveState(session, state);
-    }
-
     /// <inheritdoc />
     protected override async ValueTask<IEnumerable<ChatMessage>> ProvideChatHistoryAsync(InvokingContext context, CancellationToken cancellationToken = default)
     {
@@ -112,6 +95,25 @@ public sealed class PersistedChatHistoryProvider(
         });
     }
 
+    /// <summary>Reads the history state of a session; unbound when the store has not seen it.</summary>
+    public SessionHistoryState GetState(AgentSession session)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+
+        return _state.GetOrInitializeState(session);
+    }
+
+    /// <summary>Binds a session to its owner and continuation id, or updates its running summary.</summary>
+    public void SetState(AgentSession session, SessionHistoryState state)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(state);
+
+        _state.SaveState(session, state);
+    }
+
+    #region Private Methods
+
     private SessionHistoryState RequireBound(AgentSession? session)
     {
         if (session is null)
@@ -171,4 +173,6 @@ public sealed class PersistedChatHistoryProvider(
             history.RemoveAt(0);
         }
     }
+
+    #endregion
 }

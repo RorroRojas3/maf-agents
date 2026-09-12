@@ -102,7 +102,11 @@ internal static class AgentsConfiguration
             }
         }
 
+        #region Private Methods
+
         private static A2AException ToInvalidParams(InvalidSessionIdException exception) =>
             new(exception.Message, exception, A2AErrorCode.InvalidParams);
+
+        #endregion
     }
 }

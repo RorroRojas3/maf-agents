@@ -42,6 +42,8 @@ public sealed class AgentCatalogCache(IMemoryCache cache, IServiceScopeFactory s
     /// <inheritdoc />
     public void Invalidate() => _cache.Remove(_cacheKey);
 
+    #region Private Methods
+
     private async Task<AgentCatalog> LoadAsync(CancellationToken cancellationToken)
     {
         AsyncServiceScope scope = _scopeFactory.CreateAsyncScope();
@@ -56,4 +58,6 @@ public sealed class AgentCatalogCache(IMemoryCache cache, IServiceScopeFactory s
             return new AgentCatalog(activeModels);
         }
     }
+
+    #endregion
 }

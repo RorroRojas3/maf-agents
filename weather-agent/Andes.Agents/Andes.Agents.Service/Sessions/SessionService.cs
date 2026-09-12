@@ -87,6 +87,8 @@ public sealed class SessionService(
         _summaries.EnqueueDeletion(document);
     }
 
+    #region Private Methods
+
     private async Task<SessionRead> RequireAsync(string sessionId, CancellationToken cancellationToken)
     {
         SessionIdValidator.EnsureValid(sessionId);
@@ -94,4 +96,6 @@ public sealed class SessionService(
         return await _sessions.GetAsync(_caller.UserId, sessionId, cancellationToken).ConfigureAwait(false)
             ?? throw new NotFoundException($"Conversation '{sessionId}' was not found.");
     }
+
+    #endregion
 }

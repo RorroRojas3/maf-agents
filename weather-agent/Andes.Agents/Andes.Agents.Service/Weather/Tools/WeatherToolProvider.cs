@@ -30,6 +30,8 @@ public sealed class WeatherToolProvider(IWeatherService weather)
             description: "Get a day-by-day forecast, today included, for up to seven days at a coordinate returned by search_location."),
     ];
 
+    #region Private Methods
+
     [Description("Find places matching a name. Returns one or more candidates with coordinates.")]
     private async Task<object> SearchLocationAsync(
         [Description("City name, optionally followed by its country, such as 'Paris' or 'Paris, France'.")] string query,
@@ -87,4 +89,6 @@ public sealed class WeatherToolProvider(IWeatherService weather)
         latitude is < -90 or > 90 || longitude is < -180 or > 180 || double.IsNaN(latitude) || double.IsNaN(longitude)
             ? new ToolError("latitude must be between -90 and 90 and longitude between -180 and 180; take them from search_location.")
             : null;
+
+    #endregion
 }

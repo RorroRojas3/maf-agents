@@ -49,6 +49,8 @@ public sealed class SqlSessionSummaryRepository(PolicyDbContext ctx) : ISessionS
         }
     }
 
+    #region Private Methods
+
     private static bool IsLostRace(DbUpdateException exception) =>
         exception is DbUpdateConcurrencyException || SqlErrors.IsUniqueKeyViolation(exception);
 
@@ -129,4 +131,6 @@ public sealed class SqlSessionSummaryRepository(PolicyDbContext ctx) : ISessionS
 
         await _ctx.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
+
+    #endregion
 }
