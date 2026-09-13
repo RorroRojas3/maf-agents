@@ -1,6 +1,6 @@
 # Andes Agents documentation
 
-Engineer-facing reference for `weather-agent/Andes.Agents/` — an ASP.NET Core host for a weather agent built on [Microsoft Agent Framework](https://learn.microsoft.com/agent-framework/). Start with the architecture overview, then go to the doc for the area you're changing.
+Engineer-facing reference for `weather-agent/Andes.Agents/` — an ASP.NET Core host for a weather agent built on [Microsoft Agent Framework](https://learn.microsoft.com/agent-framework/) — and for `agents-ui/`, its Angular client. Start with the architecture overview, then go to the doc for the area you're changing.
 
 ## Architecture
 
@@ -13,6 +13,10 @@ Engineer-facing reference for `weather-agent/Andes.Agents/` — an ASP.NET Core 
 ## Agent
 
 - [Hosting and protocols](agent/hosting-and-protocols.md) — the A2A and AG-UI endpoints, the agent card, the chat-client-to-agent pipeline, tools, the prompt, and telemetry.
+
+## UI
+
+- [Angular workspace](ui/angular-workspace.md) — prerequisites and first run, the npm scripts and what each checks, project layout and styling, the `ThemeStore` example, and the ESLint and initial-chunk gates that enforce the layer rule and keep pages out of the initial chunk.
 
 ## Operations
 

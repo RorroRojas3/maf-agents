@@ -1,0 +1,17 @@
+<button
+  type="button"
+  class="btn btn-outline-secondary btn-sm"
+  placement="bottom"
+  [attr.aria-label]="label()"
+  [ngbTooltip]="tooltip"
+  (click)="store.toggle()"
+>
+  <i
+    class="bi"
+    [class.bi-moon-stars]="store.mode() === 'light'"
+    [class.bi-sun]="store.mode() === 'dark'"
+    aria-hidden="true"
+  ></i>
+</button>
+<!-- A template, not a string: ngbTooltip renders string content once, so it would go stale while open. -->
+<ng-template #tooltip>{{ label() }}</ng-template>

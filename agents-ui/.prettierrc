@@ -1,0 +1,28 @@
+{
+  "printWidth": 100,
+  "singleQuote": true,
+  "plugins": ["@ianvs/prettier-plugin-sort-imports"],
+  "importOrder": [
+    "^@angular/",
+    "<THIRD_PARTY_MODULES>",
+    "^@shared/models/",
+    "^@core/",
+    "^@services/",
+    "^@state/",
+    "^@shared/",
+    "^@components/",
+    "^@pages/",
+    "^@testing/",
+    "^[.]"
+  ],
+  "importOrderParserPlugins": ["typescript", "decorators-legacy"],
+  "importOrderTypeScriptVersion": "6.0.0",
+  "overrides": [
+    {
+      "files": "*.html",
+      "options": {
+        "parser": "angular"
+      }
+    }
+  ]
+}
