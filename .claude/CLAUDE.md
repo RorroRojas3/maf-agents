@@ -6,11 +6,11 @@ This file lives at `.claude/CLAUDE.md`, **not** the repo root. Detailed standard
 
 ## About this repository
 
-The purpose is to build and explore agents with the Microsoft Agent Framework on .NET. One solution exists, `weather-agent/Andes.Agents/Andes.Agents.slnx`, and it is a working ASP.NET Core host for a **weather agent** — read `docs/README.md` for the engineer-facing reference and `CHANGELOG.md` for what shipped.
+The purpose is to build and explore agents with the Microsoft Agent Framework on .NET. Two codebases exist: the .NET solution `agents-api/Andes.Agents.slnx`, a working ASP.NET Core host for a **weather agent**, and `agents-ui/`, its Angular client — read `docs/README.md` for the engineer-facing reference and `CHANGELOG.md` for what shipped.
 
-An earlier shape of this repo — console samples under `samples/<NN-category>/` (`HelloAgent`, `ImageAgent`), two ADRs, a shared `config/appsettings.sample.json` and a root `maf-agents.slnx` — lives on `origin/main` and is **not present on this branch**. `git show origin/main:<path>` reads any of it. Its ADRs established two conventions this branch keeps: Foundry is reached through the OpenAI SDK on the resource's `/openai/v1/` route with an API key, and stable packages are preferred — with one recorded exception below.
+An earlier shape of this repo — console samples under `samples/<NN-category>/` (`HelloAgent`, `ImageAgent`), two ADRs, a shared `config/appsettings.sample.json` and a root `maf-agents.slnx` — was removed in `40683aa` and survives only in history: `git show 40683aa^:<path>` reads any of it. Its ADRs established two conventions this repository keeps: Foundry is reached through the OpenAI SDK on the resource's `/openai/v1/` route with an API key, and stable packages are preferred — with one recorded exception below.
 
-### `weather-agent/Andes.Agents/` — the only code
+### `agents-api/` — the API
 
 Six projects, `Api → Service → Repository → Entity → Common` plus `Dto` (`Dto → Common`; `Service` references `Dto`, **`Repository` does not**), laid out exactly as `.claude/rules/api-architecture.md` prescribes. That rule is portable and names no repository; this file is where **this** solution's folder map, deviations and adopted names live — see "How this solution instantiates the architecture rule" below. `Api` is the composition root and declares a `ProjectReference` to every project it names — `Service`, `Repository` and `Dto` — rather than reaching them transitively.
 
@@ -33,7 +33,7 @@ Six projects, `Api → Service → Repository → Entity → Common` plus `Dto` 
 - **Session ids are GUIDs** — exactly `D` or `N` form (`SessionIdValidator`), because `[Core].[Session].SessionId` is a `uniqueidentifier`; the hosts issue `N` when a client sends none. A non-GUID id is a 400 `validation-error` on AG-UI and `api/conversations`. The A2A server turns any other exception into a 500 or JSON-RPC −32603, so `AgentsConfiguration` wraps the store in `A2AErrorTranslatingSessionStore`, which rethrows it as `A2AException(InvalidParams)`: 400 on HTTP+JSON, −32602 on JSON-RPC.
 - Message ids are `{sessionId}:{sequence:D8}` and the session document is replaced with `IfMatchEtag`: two concurrent turns on one session end in a **409 `conversation-busy`**, never a silent overwrite, and the loser writes nothing. A turn that stored its messages but never saved the session is healed at the next lookup from `MAX(c.sequence)` — one cheap query per turn.
 - **Session summaries never touch the turn.** After a successful Cosmos save or delete, the store and `SessionService` enqueue on `ISessionSummaryChannel` (bounded at 10,000; a full channel drops with a warning), and `SessionSummaryProcessor` writes in order, pricing from the catalog cache. Cached and reasoning tokens live under their own state key, `andes.usage.details`, so an older build that rewrites only `andes.usage` carries them through. The upsert merges cumulative counts: a lower count is an older write and changes nothing, growth adds `TokenPrices.CostOf` of the delta, and a deletion stamps `DateDeleted` and never clears it. `SessionStoreUnavailableException` (EF retries exhausted, a `SqlException` of severity 17 — out of log, disk, memory or locks — or 20 and above, a timeout) is retried with backoff; any other failure is dropped and logged by exception **type names only**.
-- `AzureAd:Scopes` or `AzureAd:AppPermissions` must be configured or startup throws (`AzureAdOptions.HasCallerRequirement`); `AzureAd:AllowAnyAuthenticatedCaller` is the explicit opt-out that `appsettings.Development.json` sets. Any app in the tenant can obtain a token for the audience — only a scope or app role proves it was granted access.
+- `AzureAd:Scopes` or `AzureAd:AppPermissions` must be configured or startup throws (`AzureAdOptions.HasCallerRequirement`); `AzureAd:AllowAnyAuthenticatedCaller` is the explicit opt-out — `false` in `appsettings.json`, so a local run without scopes sets it through user-secrets or `AzureAd__AllowAnyAuthenticatedCaller` (there is no `appsettings.Development.json`). Any app in the tenant can obtain a token for the audience — only a scope or app role proves it was granted access.
 - **Nothing a caller supplied may reach a log sink.** No bodies, no prompts, no message text, no query values, and never the `oid`. Prompt capture on spans is off in every environment; `Telemetry:EnableSensitiveData` or `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true` is the deliberate opt-in. A caller correlates a failure by the `traceId` on the problem response, which is the Application Insights operation id.
 - `Session` is the domain word; `Conversation` appears only in the wire route and the `conversation-busy` problem type. `Chat` means the model client or wire role. A Service type that persists is `Persisted<Thing>` — never `Cosmos<Thing>`, which names a store Service cannot see.
 - **`Repository` is provider-first and owns each store end to end.** Store-agnostic contracts sit in `Repository/<Feature>/Interfaces/` (`Sessions`, `Agents`); everything Cosmos-specific — client construction, options, serializer, health probe, repositories — sits under `Repository/Cosmos/` and is registered by `AddAndesCosmosPersistence`; everything EF Core and SQL Server sits under `Repository/Sql/` and is registered by `AddAndesSqlPersistence`. `Microsoft.Azure.Cosmos` and the EF Core runtime each resolve in exactly one project — `Entity` references only `Microsoft.EntityFrameworkCore.Abstractions`, for mapping attributes; another store is a sibling folder, not a refactor.
@@ -71,13 +71,28 @@ Six projects, `Api → Service → Repository → Entity → Common` plus `Dto` 
 - **`SessionsOptionsValidator` is public** while every other options validator is internal, because the composition root in Api registers it across the project boundary.
 - **`Repository` reaches `Common` through the chain** (`Repository → Entity → Common`) rather than declaring it. The composition-root clause applies to Api, where transitive reliance would hide a layering error; below it the declared chain is the contract, and `Service` uses `Common.Constants` the same way.
 
+### `agents-ui/` — the Angular client
+
+An Angular **22.1** workspace (project `agents-ui`, prefix `app`) laid out by `.claude/rules/ui-architecture.md`, which auto-applies under `src/app/`. Configured, not yet a product: an app shell, one lazy page (`pages/home/`) and one root store with its toggle. It calls no API yet — no auth, no dev proxy, no `HttpClient`.
+
+- **Stack.** No `zone.js` (the v22 default, and TestBed is zoneless too, so there is no `src/testing` providers file yet). TypeScript **6.0** — the compiler rejects 6.1 and 7 — with `paths` aliases `@pages/*` … `@testing/*` and no `baseUrl`, which TS 6 deprecates. Vitest **4** through `ng test` (the builder rejects Vitest 5) on jsdom. `@ngrx/signals` 22. npm; Node 22.22+ or 24.15+.
+- **Bootstrap is compiled from Sass with the brand palette.** `src/styles.scss` loads it with `@use 'bootstrap/scss/bootstrap' with (...)`: Summit Navy `primary`, Slate `secondary`, Glacier Blue `info`, Andes Green `success`, Ink on Snow in light, Snow on Ink with Summit Navy surfaces in dark. Components, focus rings and button text all derive from those values; only Bootstrap Icons stays precompiled CSS in `angular.json`. Angular compiles Sass with `quietDeps`, so Bootstrap's internal deprecations stay silent, and `@use … with` adds none (a `@import` in our own file would). Components generate without a stylesheet (`"style": "none"`). The initial budget warns at 750 kB because Bootstrap and Icons CSS are ~315 kB raw.
+- **The dark theme re-points primary at Glacier Blue.** Bootstrap bakes `$primary` into components once for both themes and Summit Navy is 1.27:1 on Ink, so the `[data-bs-theme='dark']` block in `styles.scss` overrides primary buttons, focus rings, checked inputs, nav pills, dropdown and list-group active items, pagination and progress. A component that bakes in primary and is missing from that block stays navy in dark mode — add it when the app first uses it. Dark muted text is Snow at 75% (Slate is 3.17:1 on Ink), and dark `.btn-outline-secondary` uses the same tone because Slate is 2.8:1 on the dark navbar. Glacier Blue and Andes Green are 2.6:1 and 2.5:1 as text on Snow: use them as fills and icons, and `text-info-emphasis` / `text-success-emphasis` for light-theme text.
+- **ng-bootstrap 21 was installed with npm, not `ng add`.** Its schematic registers `NgbModule` at the root and writes a Bootstrap SCSS `@import` that Sass 1.101 flags as deprecated; components import standalone `Ngb*` directives instead. `@angular/localize` came through its own `ng add` because ng-bootstrap needs `$localize` — it is the only polyfill.
+- **OnPush is Angular 22's default**, so components omit `changeDetection`; `prefer-on-push-component-change-detection` runs with `allowExplicitOnPush: false` and rejects an opt-out and a redundant OnPush alike.
+- **`ThemeStore`** (`state/theme-store.ts`) holds light/dark, applies it as `data-bs-theme` on `<html>` through `watchState`, and persists only an explicit choice (`andes.theme` in `localStorage`), so a visitor who never toggles follows the OS. `shared/components/theme-toggle/` binds to it and carries an `ngbTooltip`.
+- **`eslint.config.js` enforces the rule's layer table**: one `no-restricted-imports` block per folder, specs exempt, each banned folder as its alias and as `**/app/<folder>/*`, with per-feature blocks generated from the top-level folders of `src/app/components` and `src/app/pages`. It works around three traps. Flat config replaces a rule's options when blocks overlap, so every block repeats the `FormsModule`/`ReactiveFormsModule` ban. An exception negates the directory (`!@components/<f>`), because the matcher cannot re-include a child of an excluded directory. A relative import with no `app/` segment (`../../state/x`) is not caught, so cross-layer imports must use the alias. NgRx's `signalsTypeChecked` rules are added by hand and scoped to `**/*.ts`: its `ng add` skips any config without `tseslint.config`, and unscoped its parser would replace the template parser on `.html`.
+- **Prettier sorts imports** in the rule's order (`@ianvs/prettier-plugin-sort-imports`; third-party packages sit right after Angular).
+- **`npm run check:initial-chunk`** builds with `--stats-json` and fails when anything under `pages/`, `components/` or `state/<feature>/` is statically reachable from `main` or the polyfills, or when a file in `pageRoots` (`scripts/check-initial-chunk.mjs`) is not a lazy entry point. A new or moved page means updating `pageRoots`.
+- **Verified so far:** `ng build` with no warnings (initial total ~577 kB raw), `ng test` (7 tests), `ng lint`, `prettier --check`, the gate failing on a statically imported page, every layer ban firing — and not firing — on deliberate violations, and headless Edge against `ng serve`: no `zone.js` and no console errors, the palette in both themes (computed colors of buttons, links, muted text, focus rings, checked inputs, pills, list-group, pagination, progress and alerts, every text pair at AA or better), the icon font, the lazy home page, the tooltip (its text updating while open), the OS scheme followed while nothing is stored, and a toggle persisting across a reload.
+
 ## Build and tooling reality
 
 - **`Directory.Build.props` and `Directory.Packages.props` sit beside the `.slnx`.** Central package management is on — a `PackageReference` never carries a `Version`; add new versions to the props file. `TreatWarningsAsErrors`, `EnforceCodeStyleInBuild`, `AnalysisLevel latest-recommended` and `GenerateDocumentationFile` are all on, so `.editorconfig` (file-scoped namespaces, `_camelCase` fields, IDE0005 unused usings, formatting) **and** CS1591 missing-XML-doc are build errors. Every public type and member needs a `<summary>`; positional records need either no `<param>` tags or all of them. The recommended analyzers include CA1711 (no public `…Queue`/`…Collection` names), CA1816 and CA2215 (a `Dispose` override must call `GC.SuppressFinalize` and the base) and CA1859 (concrete types for private fields and locals).
 - Evaluation-only APIs (`OPENAI001` for the Responses client, `MAAI001` for the stored-output-disabled adapter) are suppressed with a call-site `#pragma`, never project-wide.
 - No `global.json`; SDK 10.0.401 builds it. `.gitattributes` forces `* text=auto eol=lf`.
 - **`dotnet-tools.json` at the repo root pins `dotnet-ef` 10.0.12** to match the EF packages. Run `dotnet tool restore`, then `dotnet tool run dotnet-ef …`: a global `dotnet-ef` on PATH may be older. Repository is both target and startup project, so the tools never boot the Api host.
-- **No CI, no tests.** `dotnet build` and `dotnet format --verify-no-changes` are the local gates; the smoke procedure in the runbook is manual.
+- **No CI, and no .NET tests.** `dotnet build` and `dotnet format --verify-no-changes` are the API's local gates; the smoke procedure in the runbook is manual. `agents-ui/` has its own (see Common commands).
 - On Windows a test server started from Git Bash is stopped by port (`netstat -ano | grep ":<port> "` then `taskkill //F //PID <pid>`); `pkill` and `taskkill //IM` leave it running and lock the DLL for the next build.
 
 ## Secrets
@@ -132,7 +147,7 @@ Full standards live in `.claude/rules/csharp.md` (auto-applies to `**/*.cs`), an
 - **Member order in services and implementations:** interface or override methods, other public instance methods, then `#region Public Static Methods`, `#region Private Methods`, `#region Loggers` (each only when non-empty); nested types last (`csharp.md`).
 - When reviewing, make only **high-confidence** suggestions; comment on _why_ a non-obvious design decision was made.
 
-**Tests.** None exist yet. When they do: xUnit **v3** under `weather-agent/Andes.Agents/tests/`, named `MethodName_Scenario_ExpectedBehavior`, Arrange-Act-Assert structure but **no** `// Arrange` / `// Act` / `// Assert` comments, plain xUnit `Assert` (no FluentAssertions — v8+ is commercially licensed), isolation with **NSubstitute** and **never Moq**, and integration tests against **Testcontainers** (a local test instance only where no image exists). Agent code that calls a live model is not unit-tested. The `csharp-xunit` skill suggests Moq and a fluent assertion library; `csharp.md` overrides it.
+**Tests.** No .NET tests exist yet. When they do: xUnit **v3** under `agents-api/tests/`, named `MethodName_Scenario_ExpectedBehavior`, Arrange-Act-Assert structure but **no** `// Arrange` / `// Act` / `// Assert` comments, plain xUnit `Assert` (no FluentAssertions — v8+ is commercially licensed), isolation with **NSubstitute** and **never Moq**, and integration tests against **Testcontainers** (a local test instance only where no image exists). Agent code that calls a live model is not unit-tested. The `csharp-xunit` skill suggests Moq and a fluent assertion library; `csharp.md` overrides it.
 
 **LINQ.** Method syntax only — `.Where(...).Join(...).Select(...)`, never query syntax (`from … in … select`).
 
@@ -149,12 +164,13 @@ The roster (names + descriptions) is always in context; these are the routing no
 
 ## Rules — `.claude/rules/`
 
-Five files, auto-loaded when you edit a matching path; the globs live in each rule's frontmatter under a `paths:` list, and none carry a `description:`.
+Six files, auto-loaded when you edit a matching path; the globs live in each rule's frontmatter under a `paths:` list, and none carry a `description:`.
 
 | Rule | `paths:` glob | Applies here? |
 | --- | --- | --- |
 | `csharp.md` | `**/*.cs` | **Yes** — the standards above. |
 | `api-architecture.md` | `**/*.cs`, `**/*.csproj` | **Yes** — where every file goes and what it is called. Portable and repo-agnostic; this solution's instance of it is in §"How this solution instantiates the architecture rule". |
+| `ui-architecture.md` | `**/src/app/**`, `**/src/testing/**` | **Yes** — `agents-ui/`: where every file goes, what it is called and which way imports run. `eslint.config.js` and `scripts/check-initial-chunk.mjs` enforce it; see §"`agents-ui/` — the Angular client". |
 | `aspnet-rest-apis.md` | `**/*.cs` | Loads on every C# edit; relevant to `Andes.Agents.Api`. |
 | `azure-functions-csharp.md` | `**/*.cs` | Loads on every C# edit, but there are no Azure Functions here. Ignore it. |
 | `terraform.md` | `**/*.tf` | No `.tf` files exist; never matches. |
@@ -163,21 +179,22 @@ When reviewing or planning without editing, `Read` the matching rule directly.
 
 ## MCP servers — see `@.mcp.json`
 
-`.claude/settings.json` sets `enableAllProjectMcpServers: true`, so the servers in `@.mcp.json` are available. Two are defined:
+`.claude/settings.json` sets `enableAllProjectMcpServers: true`, so the servers in `@.mcp.json` are available. Three are defined:
 
 - **`microsoft-learn`** (http) — ground version-specific .NET, Azure and Agent Framework answers in official docs (`microsoft_docs_search` → `microsoft_code_sample_search` → `microsoft_docs_fetch`) instead of memory.
 - **`context7`** (npx) — docs outside learn.microsoft.com; resolve the library id first, then query.
+- **`angular-cli`** (npx, `@angular/cli@22 mcp --read-only`) — the Angular CLI's own server (`list_projects`, `get_best_practices`, `search_documentation`), pinned to the major `agents-ui/` runs; the `ngrx-signal-store` skill sends non-state Angular questions here.
 
 `settings.json` also lists `terraform` under `enabledMcpjsonServers`, but `.mcp.json` does not define it, so that entry does nothing.
 
-> **Trust gate:** a checked-in `.claude/settings.json` cannot approve its own repo's MCP servers while the folder is **untrusted** — the key is ignored and servers sit at "Pending approval" until the workspace trust dialog is accepted. To auto-approve regardless, add a name-based list to your **user-level** `~/.claude/settings.json`: `"enabledMcpjsonServers": ["microsoft-learn", "context7"]`. If a server shows **Rejected**, a stale per-project choice is cached — run `claude mcp reset-project-choices` in this repo.
+> **Trust gate:** a checked-in `.claude/settings.json` cannot approve its own repo's MCP servers while the folder is **untrusted** — the key is ignored and servers sit at "Pending approval" until the workspace trust dialog is accepted. To auto-approve regardless, add a name-based list to your **user-level** `~/.claude/settings.json`: `"enabledMcpjsonServers": ["microsoft-learn", "context7", "angular-cli"]`. If a server shows **Rejected**, a stale per-project choice is cached — run `claude mcp reset-project-choices` in this repo.
 
 ## Delegation
 
 Four subagents, all pinned to extra-high reasoning effort; `csharp-code-reviewer` and `github-actions-reviewer` run on `opus`, the other two on `sonnet`. Tools and preloaded skills live in each agent's frontmatter. Reviewer loops are capped: apply Critical/High findings, re-review only the changed files, at most two rounds, then surface anything still open to the user.
 
 - **After implementing or modifying C# code**, delegate a quality review to `csharp-code-reviewer`. It reports findings; it does not edit files.
-- **After a feature is implemented and the reviewer verdict passes**, delegate to `se-technical-writer` to update the Markdown under `docs/` and add the entry to the root `CHANGELOG.md` — [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format, one `## [Unreleased]` section, one reader-facing entry per PR in the matching subsection. `docs/` follows `docs/README.md`'s index: `architecture/`, `conversations/`, `agent/`, `operations/`, `adr/`.
+- **After a feature is implemented and the reviewer verdict passes**, delegate to `se-technical-writer` to update the Markdown under `docs/` and add the entry to the root `CHANGELOG.md` — [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format, one `## [Unreleased]` section, one reader-facing entry per PR in the matching subsection. `docs/` follows `docs/README.md`'s index: `architecture/`, `conversations/`, `agent/`, `ui/`, `operations/`, `adr/`.
 - **`github-actions-reviewer`** has nothing to review until a `.github/workflows/` tree exists. If workflows are added, route to it.
 - **PRDs are not checked in.** `prd-generator` and the `prd` skill remain installed for a user who explicitly asks; nothing routes to them by default, and a PRD written that way is a scratch artifact.
 
@@ -185,16 +202,24 @@ Four subagents, all pinned to extra-high reasoning effort; `csharp-code-reviewer
 
 ```bash
 # from the repo root
-dotnet build weather-agent/Andes.Agents/Andes.Agents.slnx
-dotnet format weather-agent/Andes.Agents/Andes.Agents.slnx --verify-no-changes   # read-only check
-dotnet run --project weather-agent/Andes.Agents/Andes.Agents.Api                 # needs Foundry, Cosmos, SQL Server and AzureAd configured — see docs/operations/runbook.md
+dotnet build agents-api/Andes.Agents.slnx
+dotnet format agents-api/Andes.Agents.slnx --verify-no-changes   # read-only check
+dotnet run --project agents-api/Andes.Agents.Api                 # needs Foundry, Cosmos, SQL Server and AzureAd configured — see docs/operations/runbook.md
 
 # EF Core migrations for PolicyDbContext (Repository is target and startup project)
 dotnet tool restore
-dotnet tool run dotnet-ef migrations add <Verb><Subject> --project weather-agent/Andes.Agents/Andes.Agents.Repository --startup-project weather-agent/Andes.Agents/Andes.Agents.Repository --context PolicyDbContext --output-dir Sql/Migrations
-dotnet tool run dotnet-ef migrations has-pending-model-changes --project weather-agent/Andes.Agents/Andes.Agents.Repository --startup-project weather-agent/Andes.Agents/Andes.Agents.Repository --context PolicyDbContext
-dotnet tool run dotnet-ef migrations script --idempotent --project weather-agent/Andes.Agents/Andes.Agents.Repository --startup-project weather-agent/Andes.Agents/Andes.Agents.Repository --context PolicyDbContext -o migrations.sql
-sqlcmd -S <server> -d <database> -I -b -i migrations.sql                          # -I: the filtered index needs QUOTED_IDENTIFIER ON
+dotnet tool run dotnet-ef migrations add <Verb><Subject> --project agents-api/Andes.Agents.Repository --startup-project agents-api/Andes.Agents.Repository --context PolicyDbContext --output-dir Sql/Migrations
+dotnet tool run dotnet-ef migrations has-pending-model-changes --project agents-api/Andes.Agents.Repository --startup-project agents-api/Andes.Agents.Repository --context PolicyDbContext
+dotnet tool run dotnet-ef migrations script --idempotent --project agents-api/Andes.Agents.Repository --startup-project agents-api/Andes.Agents.Repository --context PolicyDbContext -o migrations.sql
+sqlcmd -S <server> -d <database> -I -b -i migrations.sql         # -I: the filtered index needs QUOTED_IDENTIFIER ON
+
+# agents-ui (Angular), from agents-ui/
+npm ci
+npm start                       # ng serve on http://localhost:4200
+npm test -- --watch=false       # Vitest, single run
+npm run lint                    # angular-eslint, NgRx rules and the layer bans
+npm run format:check            # Prettier, including import order
+npm run check:initial-chunk     # production build, then the initial-chunk gate
 ```
 
 Both the build and the format check pass on the current tree. There is no `dotnet test` — no test project exists. There is no root solution, so every command names its path explicitly.

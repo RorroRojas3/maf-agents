@@ -1,0 +1,105 @@
+@use 'sass:color';
+
+// Palette sampled from the Andes logo.
+$summit-navy: #14324f;
+$ink: #0b1f33;
+$glacier-blue: #21a8d8;
+$andes-green: #3fb56a;
+$slate: #5a6e82;
+$snow: #f7fafc;
+
+@use 'bootstrap/scss/bootstrap' with (
+  $primary: $summit-navy,
+  $secondary: $slate,
+  $info: $glacier-blue,
+  $success: $andes-green,
+  $color-contrast-dark: $ink,
+  $body-bg: $snow,
+  $body-color: $ink,
+  $body-emphasis-color: $ink,
+  $body-secondary-color: $slate,
+  $headings-color: $summit-navy,
+  $card-title-color: var(--bs-heading-color),
+  $body-bg-dark: $ink,
+  $body-color-dark: $snow,
+  $body-secondary-bg-dark: $summit-navy,
+  $body-tertiary-bg-dark: color.mix($summit-navy, $ink, 50%),
+  $link-color-dark: $glacier-blue,
+  $primary-text-emphasis-dark: color.mix(white, $glacier-blue, 40%),
+  $primary-bg-subtle-dark: color.mix(black, $glacier-blue, 80%),
+  $primary-border-subtle-dark: color.mix(black, $glacier-blue, 40%)
+);
+
+// Bootstrap bakes `$primary` into components once for both themes, and Summit Navy is 1.27:1 on Ink,
+// so the dark theme's primary surfaces switch to Glacier Blue here.
+[data-bs-theme='dark'] {
+  $focus-color: color.change($glacier-blue, $alpha: bootstrap.$focus-ring-opacity);
+  $focus-shadow: 0 0 0 bootstrap.$focus-ring-width $focus-color;
+
+  --bs-primary: #{$glacier-blue};
+  --bs-primary-rgb: #{bootstrap.to-rgb($glacier-blue)};
+  --bs-focus-ring-color: #{$focus-color};
+
+  .btn-primary {
+    @include bootstrap.button-variant($glacier-blue, $glacier-blue);
+  }
+
+  .btn-outline-primary {
+    @include bootstrap.button-outline-variant($glacier-blue);
+  }
+
+  // Slate is 2.8:1 on the dark navbar, short of the 3:1 an icon-only control needs.
+  .btn-outline-secondary {
+    @include bootstrap.button-outline-variant(color.change($snow, $alpha: 0.75));
+  }
+
+  .form-control:focus,
+  .form-select:focus,
+  .form-check-input:focus {
+    border-color: color.mix(white, $glacier-blue, 50%);
+    box-shadow: $focus-shadow;
+  }
+
+  .form-check-input:checked,
+  .form-check-input[type='checkbox']:indeterminate {
+    background-color: $glacier-blue;
+    border-color: $glacier-blue;
+  }
+
+  .nav-pills {
+    --bs-nav-pills-link-active-bg: #{$glacier-blue};
+    --bs-nav-pills-link-active-color: #{$ink};
+  }
+
+  .dropdown-menu {
+    --bs-dropdown-link-active-bg: #{$glacier-blue};
+    --bs-dropdown-link-active-color: #{$ink};
+  }
+
+  .list-group {
+    --bs-list-group-active-bg: #{$glacier-blue};
+    --bs-list-group-active-border-color: #{$glacier-blue};
+    --bs-list-group-active-color: #{$ink};
+  }
+
+  .pagination {
+    --bs-pagination-active-bg: #{$glacier-blue};
+    --bs-pagination-active-border-color: #{$glacier-blue};
+    --bs-pagination-active-color: #{$ink};
+    --bs-pagination-focus-box-shadow: #{$focus-shadow};
+  }
+
+  .progress,
+  .progress-stacked {
+    --bs-progress-bar-bg: #{$glacier-blue};
+    --bs-progress-bar-color: #{$ink};
+  }
+
+  .accordion {
+    --bs-accordion-btn-focus-box-shadow: #{$focus-shadow};
+  }
+
+  .btn-close {
+    --bs-btn-close-focus-shadow: #{$focus-shadow};
+  }
+}

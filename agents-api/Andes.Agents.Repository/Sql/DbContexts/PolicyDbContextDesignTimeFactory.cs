@@ -9,7 +9,7 @@ namespace Andes.Agents.Repository.Sql.DbContexts;
 internal sealed class PolicyDbContextDesignTimeFactory : IDesignTimeDbContextFactory<PolicyDbContext>
 {
     private const string _connectionStringVariable = $"ConnectionStrings__{SqlDbOptions.ConnectionStringName}";
-    private const string _placeholderConnectionString = "Server=localhost,1433;Database=AndesAgents;Integrated Security=true;TrustServerCertificate=true";
+    private const string _placeholderConnectionString = "Data Source=(localdb)\\MSSQLLocalDB;Initial Catalog=andes-agents;Integrated Security=True;Encrypt=False;TrustServerCertificate=True";
 
     public PolicyDbContext CreateDbContext(string[] args)
     {
