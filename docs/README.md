@@ -17,11 +17,19 @@ Engineer-facing reference for `weather-agent/Andes.Agents/` — an ASP.NET Core 
 ## UI
 
 - [Angular workspace](ui/angular-workspace.md) — prerequisites and first run, the npm scripts and what each checks, project layout and styling, the `ThemeStore` example, and the ESLint and initial-chunk gates that enforce the layer rule and keep pages out of the initial chunk.
+- [Authentication](ui/authentication.md) — automatic Microsoft Entra ID sign-in with MSAL: runtime configuration (`config.json`), the sign-in and redirect-bridge flow, background token renewal, the HTTP interceptor, and the app registration and hosting prerequisites.
 
 ## Operations
 
 - [Configuration](operations/configuration.md) — every configuration key, its default, and how it's supplied (`appsettings.json`, Key Vault, user-secrets, environment variables).
 - [Runbook](operations/runbook.md) — running the API locally (including SQL Server 2025), smoke-testing the agent end to end, generating and applying EF Core migrations, provisioning Cosmos DB and the policy database in a target environment, and troubleshooting.
+
+## Product requirements
+
+Planned work, specified before it is built. Nothing in these packages is implemented yet.
+
+- [CopilotKit chat for `agents-ui`](prds/copilotkit/README.md) — a production chat with the weather agent: learning docs for AG-UI, CopilotKit and A2UI, the decision log, the API and chat UI designs, verification, and the PRD.
+- [A2UI declarative generative UI](prds/a2ui/prd.md) — agent-described interface surfaces for the chat, blocked on renderer and producer support.
 
 ## Decisions
 

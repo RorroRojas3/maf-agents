@@ -103,6 +103,17 @@ On the app registration named by `ApiDocs:ClientId`, under **Authentication**, a
 
 The API must also expose the scope `ApiDocs:Scopes` names, in its fully qualified form. Two scope settings are easy to confuse: `AzureAd:Scopes` takes the **short** scope name (`access_as_user`), matched against the token's `scp` claim; `ApiDocs:Scopes` takes the **fully qualified** form (`api://<api-client-id>/access_as_user`). Neither should be `<client-id>/.default`, and `AzureAd:Audience` is normally left blank, which falls back to the client id.
 
+### Allow the Angular UI to call the API
+
+`Cors:AllowedOrigins` is empty by default — there's no `appsettings.Development.json` to carry a local override, so a run of `agents-ui/` (`ng serve` on `http://localhost:4200`) against this API needs its own origin allowed through user-secrets:
+
+```bash
+dotnet user-secrets set "Cors:AllowedOrigins:0" "https://localhost:7237"
+dotnet user-secrets set "Cors:AllowedOrigins:1" "http://localhost:4200"
+```
+
+Run the API on `https://localhost:7237`, not the `http` launch profile — `UseHttpsRedirection` runs before `UseCors`, so a browser's preflight against the `http` port gets redirected and fails. The UI's own settings (its Entra ID app registration and this API's base URL) live in `agents-ui/public/config.json`, fetched at runtime; see [Authentication](../ui/authentication.md) for that file and the **Single-page application** redirect URI (`http://localhost:4200/auth`) the shared app registration needs.
+
 ### Run
 
 ```bash

@@ -8,5 +8,14 @@
   </div>
 </nav>
 <main class="container py-4">
-  <router-outlet />
+  @if (auth.status() === 'failed') {
+    <div class="alert alert-danger d-flex flex-wrap align-items-center gap-3" role="alert">
+      <span class="me-auto">Sign-in could not be completed ({{ auth.errorCode() }}).</span>
+      <button type="button" class="btn btn-danger btn-sm" (click)="auth.retrySignIn()">
+        Try again
+      </button>
+    </div>
+  } @else {
+    <router-outlet />
+  }
 </main>

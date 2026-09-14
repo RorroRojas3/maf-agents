@@ -1,0 +1,11 @@
+{
+  "AzureAd": {
+    "Instance": "https://login.microsoftonline.com/",
+    "TenantId": "bdeeb99b-f1e9-443f-b7ff-1426199689dc",
+    "ClientId": "b40defa0-5309-45c4-82fc-cb284010cc10",
+    "Audience": "b40defa0-5309-45c4-82fc-cb284010cc10/.default"
+  },
+  "Api": {
+    "BaseUrl": "https://localhost:7237"
+  }
+}
