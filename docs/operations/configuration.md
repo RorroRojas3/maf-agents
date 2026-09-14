@@ -28,6 +28,12 @@ Bound by `Api/Options/AzureAdOptions.cs`, then handed to `Microsoft.Identity.Web
 
 Either guard failing throws on startup, naming the section it failed in.
 
+## `agents-ui` — UI configuration and the Entra ID redirect URI
+
+`agents-ui/` isn't configured through this API's `appsettings.json` — it reads its own `public/config.json` at runtime (fetched before Angular bootstraps, never compiled in), which the deployment pipeline overwrites per environment after the build. See [Authentication](../ui/authentication.md#configuration) for that file's shape and validation.
+
+The UI shares this API's app registration (`AzureAd:ClientId` above doubles as the SPA's client id), so the same registration needs a **Single-page application** redirect URI — `http://localhost:4200/auth` locally, `<origin>/auth` per deployed UI origin — in addition to whatever this API itself needs. See [Authentication](../ui/authentication.md#prerequisites-outside-the-code) for the full prerequisite list, including why the redirect URI must be registered as **Single-page application** and not **Web**.
+
 ## `KeyVault`
 
 | Key | Meaning | Default | Required |
@@ -176,7 +182,14 @@ The line never carries a request body, prompt, message text, query value, or the
 |---|---|---|---|
 | `Cors:AllowedOrigins` | List of allowed browser origins (scheme + host), e.g. `https://app.example.com`. An empty list allows no cross-origin calls at all. | `[]` | No |
 
-`appsettings.Development.json` sets this to `["http://localhost:4200"]`. AG-UI is the protocol a browser client calls directly, so this is what gates it.
+The checked-in default is empty, so a fresh checkout allows no cross-origin calls at all. `agents-ui/` runs on `http://localhost:4200` (`ng serve`) but the API on `https://localhost:7237`, so a local run against both needs this set through `dotnet user-secrets` — there's no `appsettings.Development.json` to carry it:
+
+```bash
+dotnet user-secrets set "Cors:AllowedOrigins:0" "https://localhost:7237" --project agents-api/Andes.Agents.Api
+dotnet user-secrets set "Cors:AllowedOrigins:1" "http://localhost:4200" --project agents-api/Andes.Agents.Api
+```
+
+AG-UI is the protocol a browser client calls directly, so this is what gates it. See [Authentication](../ui/authentication.md#prerequisites-outside-the-code) for why the API itself must be reached over `https://localhost:7237` rather than the `http` launch profile.
 
 ## `RateLimiting`
 

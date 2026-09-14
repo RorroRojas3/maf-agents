@@ -2,7 +2,7 @@
 
 ## Overview
 
-`agents-ui/` is the Angular client for the agents platform: an Angular **22.1** workspace (project `agents-ui`, prefix `app`), zoneless by default. It is configured, not yet a product — an app shell with a theme toggle and one lazy page — and calls no API yet: no `HttpClient`, no auth, no dev proxy to `agents-api/`. Its job today is the scaffolding a real feature will land in: the folder layout, the lint rules that keep imports flowing one way, and the build gate that keeps a route out of the initial bundle.
+`agents-ui/` is the Angular client for the agents platform: an Angular **22.1** workspace (project `agents-ui`, prefix `app`), zoneless by default. It is configured, not yet a product — an app shell with a theme toggle and one lazy page, no dev proxy to `agents-api/` yet — but every visitor is now signed in automatically through Microsoft Entra ID before the app renders, and `HttpClient` calls to the API carry a bearer token. See [Authentication](authentication.md) for that flow end to end. Its job today is the scaffolding a real feature will land in: the folder layout, the lint rules that keep imports flowing one way, and the build gate that keeps a route out of the initial bundle.
 
 Use this page to get the workspace running and to understand the checks its `npm` scripts run. For where a new file goes and which layers may import which, go straight to [`.claude/rules/ui-architecture.md`](../../.claude/rules/ui-architecture.md) — this page doesn't restate its tables.
 
@@ -17,27 +17,29 @@ npm ci
 npm start
 ```
 
-`npm start` runs `ng serve` on `http://localhost:4200`, rebuilding on save. There's nothing to sign in to and nothing to point at `agents-api/` yet.
+`npm start` runs `ng serve` on `http://localhost:4200`, rebuilding on save. It signs in through Microsoft Entra ID on first load (see [Authentication](authentication.md)) using the values in `public/config.json`; there's still no dev proxy to `agents-api/`, so a call to the API needs its own CORS origin allowed (see the [runbook](../operations/runbook.md#allow-the-angular-ui-to-call-the-api)).
 
 ## npm scripts
 
 | Script | Runs | What it verifies |
 | --- | --- | --- |
 | `npm start` | `ng serve` | Dev server on `http://localhost:4200`, no checks. |
-| `npm run build` | `ng build` (production by default) | Compiles to `dist/agents-ui/` and enforces the production budgets — a warning at 750 kB and a hard error at 1 MB for the initial bundle, 4 kB/8 kB for any single component's styles. |
+| `npm run build` | `ng build` (production by default) | Compiles to `dist/agents-ui/` and enforces the production budgets — a warning at 900 kB and a hard error at 1 MB for the initial bundle, 4 kB/8 kB for any single component's styles. The warning threshold moved from 750 kB once MSAL joined the initial chunk (see [Styling](#styling) and [Authentication](authentication.md)). |
 | `npm run watch` | `ng build --watch --configuration development` | Unoptimized incremental build for local iteration; no budgets. |
 | `npm test` | `ng test` | Unit tests via the Angular build system's Vitest 4 integration, on jsdom. `TestBed` is zoneless by default, matching the app. Pass `-- --watch=false` for a single run. |
 | `npm run lint` | `ng lint` (`@angular-eslint/builder:lint`) | ESLint over `src/**/*.ts` and `*.html` — angular-eslint's recommended and accessibility template rules, the NgRx `signalsTypeChecked` rules, the OnPush and `inject()`/signal-API preferences, the `FormsModule`/`ReactiveFormsModule` ban, and the layer-boundary bans described below. |
 | `npm run format` / `npm run format:check` | Prettier (write / check) | Formatting plus import order (`@ianvs/prettier-plugin-sort-imports`): Angular, then third-party, then `@shared/models` → `@core` → `@services` → `@state` → `@shared` → `@components` → `@pages` → `@testing` → relative. |
 | `npm run check:initial-chunk` | `ng build --stats-json` then `node scripts/check-initial-chunk.mjs` | The initial-chunk gate — see below. |
 
-Verified locally so far: a production build with no warnings, 7 unit tests passing, a clean lint and a clean Prettier check, the gate passing and failing correctly on a deliberately static-imported page, and every layer ban firing (and not firing) on deliberate violations. A headless-browser run against `ng serve` also confirmed no `zone.js` and no console errors, the brand palette in both themes (computed colors of the common Bootstrap components, with every text pair at WCAG AA or better), the icon font, the lazy home page, the tooltip (its text updating while it stays open), the OS color scheme followed while nothing is stored, and a toggled theme surviving a reload.
+Verified locally so far: a production build with no warnings at the 900 kB budget (initial 887.57 kB raw), 43 unit tests passing — parsing and loading `config.json`, the renewal schedule's math, the redirect bridge, `AuthStore`, `TokenRefreshService`, and the app shell, in addition to the earlier theme-toggle coverage — a clean lint and a clean Prettier check, the gate passing and failing correctly on a deliberately static-imported page, and every layer ban firing (and not firing) on deliberate violations. A headless-browser run against `ng serve`, from before sign-in was added, confirmed no `zone.js` and no console errors, the brand palette in both themes (computed colors of the common Bootstrap components, with every text pair at WCAG AA or better), the icon font, the lazy home page, the tooltip (its text updating while it stays open), the OS color scheme followed while nothing is stored, and a toggled theme surviving a reload — a real Entra ID sign-in through a browser hasn't been re-verified against the current build.
 
 ## Project layout and naming
 
 Files are grouped by kind at the top level (`pages/`, `components/`, `state/`, `services/`, `core/`, `shared/`) and by feature one level down, with one path alias per top-level folder (`@pages/*`, `@components/*`, `@state/*`, `@services/*`, `@core/*`, `@shared/*`, `@testing/*`) and no `baseUrl` — TypeScript 6 deprecates it, so `tsconfig.json` carries only `paths`. The full layout, naming suffixes, dependency direction and placement tables live in [`.claude/rules/ui-architecture.md`](../../.claude/rules/ui-architecture.md); it applies automatically to anything under `src/app/` and `src/testing/`.
 
 Two schematic defaults worth knowing before you run `ng generate`: components generate with no stylesheet (`"style": "none"`; pass `--style scss` when a component genuinely needs one), and guards and interceptors use a **dot** type separator (`auth.guard.ts`, not `auth-guard.ts`), matching the rule's dot-vs-dash convention for Angular artifact kinds.
+
+`src/testing/` now holds its first fixtures — `app-settings.ts` (a `testAppSettings` value) and `msal.ts` (a fake `IPublicClientApplication` built on msal-browser's own `stubbedPublicClientApplication`, plus `provideAuthTesting()`) — used by the specs under `core/auth/`. `tsconfig.app.json` excludes `src/testing/**` and every `*.spec.ts`, so none of it ships in the app bundle; `tsconfig.spec.json` includes it. There's still no `src/testing` providers file that wires every fixture together for a whole-app test — each spec composes only the fakes it needs.
 
 ## Styling
 
@@ -58,7 +60,7 @@ Three constraints come from contrast, all measured in both themes:
 - **Muted text is lighter in the dark theme.** Slate is 3.17:1 on Ink, below the 4.5:1 AA minimum, so dark muted text is Snow at 75% (9.4:1). Slate stays on icons, where 3:1 is enough on Ink. On the lighter dark navbar it drops to 2.8:1, so the dark `.btn-outline-secondary` uses the muted tone instead.
 - **Glacier Blue and Andes Green aren't light-theme text colors.** They reach only 2.6:1 and 2.5:1 on Snow. Use them as fills, icons and indicators; for text on light backgrounds use `text-info-emphasis` and `text-success-emphasis`, both about 10:1.
 
-Bootstrap and Icons CSS are most of the initial bundle's weight: about 315 kB raw of a current initial total of about 577 kB raw (~109 kB estimated transfer), against a production budget that warns at 750 kB and errors at 1 MB.
+Bootstrap and Icons CSS account for about 315 kB raw of the current initial total, 887.57 kB raw (~175 kB estimated transfer). The rest of the increase since the workspace's first commit is `@azure/msal-browser` — about 280 kB minified, tree-shakes poorly, and has to sit in the initial chunk because sign-in blocks the very first render (see [Authentication](authentication.md)). The production budget's warning threshold moved from 750 kB to 900 kB for that reason; the 1 MB hard error is unchanged.
 
 `@ng-bootstrap/ng-bootstrap` (21.0.0) was installed with plain `npm install`, not `ng add`. Its schematic registers `NgbModule` application-wide and writes a Bootstrap SCSS `@import` into `styles.scss`, a form current Sass flags as deprecated where the workspace's `@use … with` compiles clean. Import the standalone `Ngb*` directives (`NgbTooltip`, and so on) per component instead. `@angular/localize` was added separately, through its own `ng add`, because ng-bootstrap's components call `$localize`; it's the app's only polyfill (`polyfills: ["@angular/localize/init"]` in `angular.json`).
 
@@ -114,5 +116,6 @@ Two smaller things worth knowing if you touch `eslint.config.js`: flat config re
 
 ## See also
 
+- [Authentication](authentication.md) — automatic Microsoft Entra ID sign-in, `config.json`, and background token renewal.
 - [`.claude/rules/ui-architecture.md`](../../.claude/rules/ui-architecture.md) — the layout, naming and dependency-direction rule this workspace follows.
 - The root `.mcp.json` also defines an `angular-cli` MCP server (`npx @angular/cli@22 mcp --read-only`) for querying Angular CLI documentation and schematics from Claude Code.

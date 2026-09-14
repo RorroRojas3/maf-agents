@@ -17,6 +17,7 @@ Engineer-facing reference for `weather-agent/Andes.Agents/` — an ASP.NET Core 
 ## UI
 
 - [Angular workspace](ui/angular-workspace.md) — prerequisites and first run, the npm scripts and what each checks, project layout and styling, the `ThemeStore` example, and the ESLint and initial-chunk gates that enforce the layer rule and keep pages out of the initial chunk.
+- [Authentication](ui/authentication.md) — automatic Microsoft Entra ID sign-in with MSAL: runtime configuration (`config.json`), the sign-in and redirect-bridge flow, background token renewal, the HTTP interceptor, and the app registration and hosting prerequisites.
 
 ## Operations
 
