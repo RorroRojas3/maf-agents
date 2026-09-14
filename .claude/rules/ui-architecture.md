@@ -2,6 +2,8 @@
 paths:
   - "**/src/app/**"
   - "**/src/testing/**"
+  - "**/src/styles.scss"
+  - "**/src/styles/**"
 ---
 
 # UI architecture (Angular `src/app/`)
@@ -27,7 +29,7 @@ src/testing/                  fixtures, fakes, the providers file (@testing/*)
 ## Rules that apply everywhere
 
 - **Kind first, feature second.** A feature named `chat` has `pages/chat/`, `components/chat/`, `state/chat/`. The same folder name in every kind folder is what makes a feature findable.
-- **Component files are suffix-free**: `chat.ts` / `chat.html` / `chat.scss`, class `Chat`, selector `app-chat`. Every other kind carries its suffix: `-store.ts`, `-client.ts` / `-service.ts`, `.guard.ts`, `.interceptor.ts`, `.routes.ts` (a `Routes` array), `-route.ts` (a URL or query-param contract), `.token.ts`, `.model.ts`, `with-*.ts`. The CLI generates the component form; the suffix on everything else is what a file search keys on. The separator is part of the convention: a **dash** where the suffix says what the file is one of (`-store`, `-client`, `-service`, `-route`), a **dot** on the Angular artefact kinds (`.guard`, `.interceptor`, `.routes`, `.token`, `.model`).
+- **Component files are suffix-free**: `chat.ts` / `chat.html` / `chat.scss`, class `Chat`, selector `app-chat`. Every other kind carries its suffix: `-store.ts`, `-client.ts` / `-service.ts`, `.guard.ts`, `.resolver.ts`, `.interceptor.ts`, `.routes.ts` (a `Routes` array), `-route.ts` (a URL or query-param contract), `.token.ts`, `.model.ts`, `with-*.ts`. The CLI generates the component form; the suffix on everything else is what a file search keys on. The separator is part of the convention: a **dash** where the suffix says what the file is one of (`-store`, `-client`, `-service`, `-route`), a **dot** on the Angular artefact kinds (`.guard`, `.resolver`, `.interceptor`, `.routes`, `.token`, `.model`).
 - **One component per folder only under `shared/components/`** (`shared/components/empty-state/empty-state.ts`). Under `components/<feature>/` files sit flat, nesting one level when a feature has sub-areas (`components/chat/transcript/assistant-turn.ts`). No `models/` or `utils/` sub-folders inside `components/` — a feature type is `<name>.model.ts` beside its consumer, because `components/admin/models/` is the model-catalog tab, not a types folder.
 - **No barrel `index.ts`.** Import by full aliased path. Barrels hide the layer an import crosses and defeat tree-shaking of lazy chunks.
 - **Specs are colocated**: `foo.spec.ts`, `foo.a11y.spec.ts`; one spec may cover a folder of tiny presentational components. Specs are exempt from every layer ban. Fixtures and fakes live in `src/testing/`, outside `src/app`.
@@ -73,6 +75,9 @@ pages → components/<feature> → shared/components|directives|pipes → state 
 | Component-provided `@Injectable` written by one feature, read by another | `core/<topic>/<name>.ts` | A seam is a contract nobody owns; scope still comes from `providers:` on the page |
 | HTTP call one store owns | in that store, `state/<name>-store.ts` | A client wrapping a single store's fetch is indirection, not a layer |
 | Streaming transport, or a client two or more consumers share | `services/<domain>/<name>-client.ts`; non-HTTP `-service.ts`; its test-seam token beside it | Always a domain sub-folder — a flat `services/` reads as noise past four files |
+| Agent-protocol client subclass (an AG-UI `HttpAgent`) | `services/agents/<name>-client.ts` | It is a streaming transport; the library that drives it is configured in the page's `provide*()` |
+| Route resolver | `pages/<feature>/<name>.resolver.ts` | Only its routes run it |
+| Service a component provides for its own subtree | `components/<feature>/<name>-service.ts` | Its scope is that component's `providers:`; one another feature reads is a seam in `core/` |
 | Reusable `signalStoreFeature` | `core/state/with-<name>.ts` | Store policy; imports only `core/` |
 | Event group | `core/events/<domain>-events.ts` | The only legal upward signal out of `core` |
 | `InjectionToken` with one owner | beside the owner, `<name>.token.ts` | A token exists for its consumer |
@@ -109,3 +114,14 @@ pages → components/<feature> → shared/components|directives|pipes → state 
 
 - `ChangeDetectionStrategy.OnPush`, `input()` / `output()` / `model()`, `inject()`, `host: {}` instead of `@HostBinding`, `@if` / `@for` / `@empty`.
 - `imports:` alphabetized. Import statements ordered Angular → `@shared/models` → `@core` → `@services` → `@state` → `@shared` → `@components` → relative, which is the dependency graph read bottom-up.
+
+## Styling and layout
+
+Bootstrap is the design system, and the brand palette reaches components only through Bootstrap's theme. The examples are this repository's: Bootstrap 5.3 compiled from `src/styles.scss`, ng-bootstrap, and a light and a dark theme on `data-bs-theme`.
+
+- **Bootstrap first.** Reach for a Bootstrap component or utility before writing CSS: the grid, `d-flex` and `gap-*` for layout; spacing and typography utilities; `card`, `list-group`, `alert`, `badge`, `placeholder`, `spinner-border`, `table`. Interactive widgets are standalone ng-bootstrap directives and services (`NgbOffcanvas`, `NgbModal`, `NgbDropdown`, `NgbTooltip`) — never Bootstrap's JavaScript bundle, never `NgbModule`.
+- **Custom CSS is the exception.** A component stylesheet holds only what utilities can't express, reads Bootstrap's CSS variables (`var(--bs-border-color)`, `var(--bs-primary)`, `var(--bs-body-font-family)`) rather than hex values, and stays inside the `anyComponentStyle` budget. Global styles are partials, `src/styles/_<topic>.scss`, pulled in with `@use`. CSS only a lazy page needs ships as a non-injected style bundle (`inject: false` plus a `bundleName` in `angular.json`) that the page loads, because every global stylesheet counts against the initial budget.
+- **Mobile-first.** Lay a screen out for about 360 px, then add breakpoint utilities (`d-none d-lg-flex`, `col-12 col-lg-9`) for wider screens. No fixed pixel widths on layout containers; full-height layouts use `100dvh`; tables and code blocks scroll inside their container instead of widening the page; interactive targets meet WCAG 2.2's 24×24 px minimum. A panel that is a sidebar on large screens becomes an `NgbOffcanvas` on small ones rather than a second layout. Check every screen at 360, 768 and 1280 px in both themes.
+- **The palette only through theme tokens.** Colours come from the theme `src/styles.scss` configures — `primary`, `secondary`, `info`, `success`, and the body and emphasis colours for light and dark. A new colour joins that palette block; it is never inlined in a component or template. Every text and background pair meets WCAG AA under `data-bs-theme="light"` and `"dark"`, and a Bootstrap component that bakes in `$primary` gets its override in the `[data-bs-theme='dark']` block when the app first uses it.
+- **Third-party design systems are themed, not adopted.** A library that ships its own look (a Tailwind-based chat kit, say) is restyled in one global partial that maps its CSS custom properties onto `--bs-*` variables and follows `data-bs-theme`, adding whatever hook the library keys on, such as a `.dark` class. Its utility classes never appear in our templates, and our markup rendered inside it carries `app-bs-island not-prose` so the library's resets and typography stay out.
+- **Icons** are Bootstrap Icons (`<i class="bi bi-…">`) with `aria-hidden="true"` beside visible or `visually-hidden` text.

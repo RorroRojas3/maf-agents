@@ -24,6 +24,13 @@ Engineer-facing reference for `weather-agent/Andes.Agents/` — an ASP.NET Core 
 - [Configuration](operations/configuration.md) — every configuration key, its default, and how it's supplied (`appsettings.json`, Key Vault, user-secrets, environment variables).
 - [Runbook](operations/runbook.md) — running the API locally (including SQL Server 2025), smoke-testing the agent end to end, generating and applying EF Core migrations, provisioning Cosmos DB and the policy database in a target environment, and troubleshooting.
 
+## Product requirements
+
+Planned work, specified before it is built. Nothing in these packages is implemented yet.
+
+- [CopilotKit chat for `agents-ui`](prds/copilotkit/README.md) — a production chat with the weather agent: learning docs for AG-UI, CopilotKit and A2UI, the decision log, the API and chat UI designs, verification, and the PRD.
+- [A2UI declarative generative UI](prds/a2ui/prd.md) — agent-described interface surfaces for the chat, blocked on renderer and producer support.
+
 ## Decisions
 
 - [ADR-0001: Pin the preview Agent Framework hosting packages](adr/0001-preview-hosting-packages.md)
